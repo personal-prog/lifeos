@@ -1243,82 +1243,42 @@
 			function setupRealtimeSubscriptions() {
 				// Listen for changes to schedule (weeks table)
 				sb.channel("lifeos-weeks-changes")
-					.on(
-						"postgres_changes",
-						{
-							event: "*",
-							schema: "public",
-							table: "lifeos_weeks",
-						},
+					.on("postgres_changes", { event: "*", schema: "public", table: "lifeos_weeks" },
 						(payload) => {
-							// Ignore if this was triggered by our own save (within 3 seconds)
-							if (Date.now() - lastSaveTime < 3000) return;
+							if (payload.new?.device_id === DEVICE_ID) return;
 							const remoteWeekKey = payload.new?.week_key;
 							if (!remoteWeekKey) return;
-							// Update state with remote data
 							if (payload.new?.schedule) {
-								if (!state.weeks[remoteWeekKey])
-									state.weeks[remoteWeekKey] = {
-										key: remoteWeekKey,
-									};
-								state.weeks[remoteWeekKey].schedule =
-									payload.new.schedule;
+								if (!state.weeks[remoteWeekKey]) state.weeks[remoteWeekKey] = { key: remoteWeekKey };
+								state.weeks[remoteWeekKey].schedule = payload.new.schedule;
 								saveLocalState();
-								// Re-render if we're looking at this week
-								if (
-									remoteWeekKey ===
-									getWeekKey(currentWeekOffset)
-								) {
+								if (remoteWeekKey === getWeekKey(currentWeekOffset)) {
 									renderAll();
-									showToast(
-										"Schedule updated from another device",
-									);
+									showToast("Schedule updated from another device");
 								}
 							}
-						},
-					)
-					.subscribe();
+						}
+					).subscribe();
 
-				// Listen for changes to tasks/goals table
 				sb.channel("lifeos-tasks-changes")
-					.on(
-						"postgres_changes",
-						{
-							event: "*",
-							schema: "public",
-							table: "lifeos_tasks",
-						},
+					.on("postgres_changes", { event: "*", schema: "public", table: "lifeos_tasks" },
 						(payload) => {
-							// Ignore if this was triggered by our own save (within 3 seconds)
-							if (Date.now() - lastSaveTime < 3000) return;
+							if (payload.new?.device_id === DEVICE_ID) return;
 							const remoteWeekKey = payload.new?.week_key;
 							if (!remoteWeekKey) return;
-							// Update state with remote tasks
 							if (payload.new?.tasks !== undefined) {
-								state.weeklyTasks[remoteWeekKey] =
-									payload.new.tasks;
+								state.weeklyTasks[remoteWeekKey] = payload.new.tasks;
 								saveLocalState();
-								// Re-render if we're looking at this week
-								if (
-									remoteWeekKey ===
-									getWeekKey(currentWeekOffset)
-								) {
+								if (remoteWeekKey === getWeekKey(currentWeekOffset)) {
 									updateProgress();
-									if (
-										document
-											.getElementById("view-tasks")
-											.classList.contains("active")
-									) {
+									if (document.getElementById("view-tasks").classList.contains("active")) {
 										renderWeeklyTasks();
 									}
-									showToast(
-										"Goals updated from another device",
-									);
+									showToast("Goals updated from another device");
 								}
 							}
-						},
-					)
-					.subscribe();
+						}
+					).subscribe();
 			}
 
 			function setSyncStatus(status) {
@@ -1567,8 +1527,8 @@
 			// Debounce timer for Supabase saves
 			let saveTimers = {};
 
-			// Track our own save timestamps to ignore our own realtime echoes
-			let lastSaveTime = 0;
+			// Unique device ID to suppress our own realtime echoes
+			const DEVICE_ID = Math.random().toString(36).slice(2, 10);
 
 			function uid() {
 				return Math.random().toString(36).slice(2, 10);
@@ -1627,7 +1587,6 @@
 				if (!supabaseReady) return;
 				if (saveTimers[weekKey]) clearTimeout(saveTimers[weekKey]);
 				saveTimers[weekKey] = setTimeout(async () => {
-					lastSaveTime = Date.now();
 					setSyncStatus("syncing");
 					try {
 						const weekData = state.weeks[weekKey];
@@ -1639,6 +1598,7 @@
 									{
 										week_key: weekKey,
 										schedule: weekData.schedule,
+										device_id: DEVICE_ID,
 										updated_at: new Date().toISOString(),
 									},
 									{ onConflict: "week_key" },
@@ -1651,6 +1611,7 @@
 									{
 										week_key: weekKey,
 										tasks: taskData,
+										device_id: DEVICE_ID,
 										updated_at: new Date().toISOString(),
 									},
 									{ onConflict: "week_key" },
