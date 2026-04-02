@@ -1074,20 +1074,23 @@
 			}
 
 			.habit-edit-btn {
-				width: 22px;
-				height: 22px;
-				border-radius: 6px;
+				width: 32px;
+				height: 32px;
+				border-radius: 8px;
 				background: rgba(255,255,255,0.08);
-				border: none;
+				border: 1px solid rgba(255,255,255,0.08);
 				cursor: pointer;
 				display: flex;
 				align-items: center;
 				justify-content: center;
-				font-size: 11px;
+				font-size: 13px;
 				color: rgba(255,255,255,0.5);
 				transition: all 0.2s;
+				flex-shrink: 0;
+				position: relative;
+				z-index: 2;
 			}
-			.habit-edit-btn:hover { background: rgba(255,255,255,0.15); }
+			.habit-edit-btn:hover { background: rgba(255,255,255,0.18); color: var(--text); }
 
 			.habit-check.checked {
 				background: var(--accent);
@@ -1126,6 +1129,73 @@
 				transition: all 0.2s;
 			}
 			.habit-activate-btn:hover { background: var(--accent); color: white; }
+
+			/* ── HABIT LIMIT CONTROL ── */
+			.habits-limit-control {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				font-size: 12px;
+				color: var(--muted);
+			}
+			.limit-btn {
+				width: 24px; height: 24px;
+				border-radius: 6px;
+				background: var(--surface2);
+				border: 1px solid var(--border);
+				color: var(--text);
+				font-size: 14px;
+				cursor: pointer;
+				display: flex; align-items: center; justify-content: center;
+				transition: background 0.15s;
+				flex-shrink: 0;
+			}
+			.limit-btn:hover { background: var(--border); }
+			.limit-value {
+				font-family: 'Syne', sans-serif;
+				font-weight: 700;
+				font-size: 14px;
+				color: var(--accent);
+				min-width: 16px;
+				text-align: center;
+			}
+
+			/* ── TEMPLATE SYSTEM ── */
+			.template-bar {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 10px 16px;
+				background: var(--surface);
+				border-bottom: 1px solid var(--border);
+				font-size: 12px;
+				gap: 8px;
+			}
+			.template-status {
+				color: var(--muted);
+				flex: 1;
+			}
+			.template-status strong {
+				color: var(--text);
+				font-weight: 600;
+			}
+			.template-btn {
+				background: var(--surface2);
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				padding: 6px 12px;
+				font-size: 11px;
+				font-family: 'Syne', sans-serif;
+				font-weight: 600;
+				color: var(--text);
+				cursor: pointer;
+				white-space: nowrap;
+				transition: all 0.2s;
+				flex-shrink: 0;
+			}
+			.template-btn:hover { border-color: var(--accent); color: var(--accent); }
+			.template-btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+			.template-btn.primary:hover { background: #2563eb; }
 		</style>
 	</head>
 	<body>
@@ -1213,6 +1283,11 @@
 
 			<!-- WEEKLY VIEW -->
 			<div class="view active" id="view-weekly">
+				<div class="template-bar" id="templateBar">
+					<div class="template-status" id="templateStatus">Loading…</div>
+					<button class="template-btn" id="templateApplyBtn" onclick="applyTemplateToWeek()" style="display:none">Apply my template</button>
+					<button class="template-btn primary" id="templateSaveBtn" onclick="saveAsTemplate()">Save as template</button>
+				</div>
 				<div class="legend">
 					<div class="legend-item">
 						<div
@@ -1299,8 +1374,16 @@
 			<!-- HABITS VIEW -->
 			<div class="view" id="view-habits">
 				<div class="habits-header">
-					<div class="habits-date" id="habitsDate"></div>
-					<div class="habits-streak-summary" id="habitsStreakSummary"></div>
+					<div>
+						<div class="habits-date" id="habitsDate"></div>
+						<div class="habits-streak-summary" id="habitsStreakSummary"></div>
+					</div>
+					<div class="habits-limit-control">
+						<span>Max active</span>
+						<button class="limit-btn" onclick="changeHabitLimit(-1)">−</button>
+						<div class="limit-value" id="habitLimitValue">4</div>
+						<button class="limit-btn" onclick="changeHabitLimit(1)">+</button>
+					</div>
 				</div>
 				<div class="habits-container" id="habitsContainer"></div>
 			</div>
@@ -1941,6 +2024,83 @@
 				saveToSupabase(key);
 			}
 
+			// ═══════════════════════════════════════════════════════════════
+			// TEMPLATE SYSTEM
+			// ═══════════════════════════════════════════════════════════════
+			const TEMPLATE_KEY = 'lifeos_week_template';
+
+			function getTemplate() {
+				try {
+					const raw = localStorage.getItem(TEMPLATE_KEY);
+					return raw ? JSON.parse(raw) : null;
+				} catch(e) { return null; }
+			}
+
+			function saveAsTemplate() {
+				const data = getWeekData(currentWeekOffset);
+				// Deep copy schedule, strip done flags
+				const clean = {};
+				DAYS.forEach(day => {
+					clean[day] = (data.schedule[day] || []).map(b => ({
+						...b,
+						id: uid(), // fresh IDs so template blocks are independent
+						done: false
+					}));
+				});
+				localStorage.setItem(TEMPLATE_KEY, JSON.stringify(clean));
+				updateTemplateBar();
+				showToast('✓ Saved as your weekly template');
+			}
+
+			function applyTemplateToWeek() {
+				const template = getTemplate();
+				if (!template) { showToast('No template saved yet'); return; }
+				const key = getWeekKey(currentWeekOffset);
+				// Deep copy with fresh IDs and done:false
+				const fresh = {};
+				DAYS.forEach(day => {
+					fresh[day] = (template[day] || []).map(b => ({
+						...b,
+						id: uid(),
+						done: false
+					}));
+				});
+				state.weeks[key] = { schedule: fresh, key };
+				saveState(key);
+				renderAll();
+				updateTemplateBar();
+				showToast('✓ Template applied to this week');
+			}
+
+			function weekIsEmpty(offset) {
+				const data = getWeekData(offset);
+				return DAYS.every(day => (data.schedule[day] || []).length === 0);
+			}
+
+			function updateTemplateBar() {
+				const template = getTemplate();
+				const statusEl = document.getElementById('templateStatus');
+				const applyBtn = document.getElementById('templateApplyBtn');
+				const saveBtn  = document.getElementById('templateSaveBtn');
+				if (!statusEl) return;
+
+				if (!template) {
+					statusEl.innerHTML = '<strong>No template saved.</strong> Build your week and save it as a template.';
+					applyBtn.style.display = 'none';
+					saveBtn.style.display = 'block';
+					saveBtn.textContent = 'Save as template';
+					saveBtn.classList.remove('primary');
+				} else {
+					const isEmpty = weekIsEmpty(currentWeekOffset);
+					statusEl.innerHTML = `<strong>Template saved.</strong> ${isEmpty ? 'This week is empty.' : 'This week has been customized.'}`;
+					applyBtn.style.display = 'block';
+					applyBtn.textContent = isEmpty ? 'Apply my template' : 'Reset to template';
+					saveBtn.style.display = 'block';
+					saveBtn.textContent = 'Update template';
+					saveBtn.classList.add('primary');
+				}
+			}
+
 			// LOAD WEEK DATA (local first, then Supabase if missing)
 			async function ensureWeekLoaded(offset) {
 				const key = getWeekKey(offset);
@@ -1965,11 +2125,22 @@
 				// Fall back to local
 				if (!state.weeks[key]) {
 					const isCurrentWeek = offset === 0;
-					state.weeks[key] = { schedule: defaultBlocks(), key };
+					const template = getTemplate();
+					let schedule;
+					if (template) {
+						// Apply template with fresh IDs and done:false
+						schedule = {};
+						DAYS.forEach(day => {
+							schedule[day] = (template[day] || []).map(b => ({
+								...b, id: uid(), done: false
+							}));
+						});
+					} else {
+						schedule = defaultBlocks();
+					}
+					state.weeks[key] = { schedule, key };
 					if (!state.weeklyTasks[key]) {
-						state.weeklyTasks[key] = isCurrentWeek
-							? getDefaultWeeklyTasks()
-							: [];
+						state.weeklyTasks[key] = isCurrentWeek ? getDefaultWeeklyTasks() : [];
 					}
 					saveLocalState();
 					saveToSupabase(key);
@@ -1979,7 +2150,17 @@
 			function getWeekData(offset) {
 				const key = getWeekKey(offset);
 				if (!state.weeks[key]) {
-					state.weeks[key] = { schedule: defaultBlocks(), key };
+					const template = getTemplate();
+					let schedule;
+					if (template) {
+						schedule = {};
+						DAYS.forEach(day => {
+							schedule[day] = (template[day] || []).map(b => ({ ...b, id: uid(), done: false }));
+						});
+					} else {
+						schedule = defaultBlocks();
+					}
+					state.weeks[key] = { schedule, key };
 					saveState(key);
 				}
 				return state.weeks[key];
@@ -2458,7 +2639,63 @@
 				{ key: 'financial', label: '💰 Financial',   color: '#f97316' },
 			];
 
-			const MAX_ACTIVE_HABITS = 4;
+			const MAX_ACTIVE_HABITS_DEFAULT = 4;
+			let maxActiveHabits = parseInt(localStorage.getItem('lifeos_habit_limit') || MAX_ACTIVE_HABITS_DEFAULT);
+
+			// ── Settings (Supabase-synced) ──
+			async function loadSettingsRemote() {
+				if (!supabaseReady) return;
+				try {
+					const { data } = await sb.from('lifeos_settings').select('*');
+					if (data?.length) {
+						data.forEach(row => {
+							if (row.key === 'habit_limit') {
+								maxActiveHabits = parseInt(row.value) || MAX_ACTIVE_HABITS_DEFAULT;
+								localStorage.setItem('lifeos_habit_limit', maxActiveHabits);
+							}
+						});
+						updateHabitLimitDisplay();
+					}
+				} catch(e) {}
+			}
+
+			async function saveSettingRemote(key, value) {
+				if (!supabaseReady) return;
+				try {
+					await sb.from('lifeos_settings').upsert(
+						{ key, value, device_id: DEVICE_ID, updated_at: new Date().toISOString() },
+						{ onConflict: 'key' }
+					);
+				} catch(e) {}
+			}
+
+			function setupSettingsRealtime() {
+				if (!supabaseReady) return;
+				sb.channel('lifeos-settings-rt')
+					.on('postgres_changes', { event: '*', schema: 'public', table: 'lifeos_settings' }, (payload) => {
+						if (payload.new?.device_id === DEVICE_ID) return;
+						if (payload.new?.key === 'habit_limit') {
+							maxActiveHabits = parseInt(payload.new.value) || MAX_ACTIVE_HABITS_DEFAULT;
+							localStorage.setItem('lifeos_habit_limit', maxActiveHabits);
+							updateHabitLimitDisplay();
+							if (document.getElementById('view-habits').classList.contains('active')) renderHabits();
+							showToast('Habit limit updated from another device');
+						}
+					}).subscribe();
+			}
+
+			function updateHabitLimitDisplay() {
+				const el = document.getElementById('habitLimitValue');
+				if (el) el.textContent = maxActiveHabits;
+			}
+
+			function changeHabitLimit(delta) {
+				maxActiveHabits = Math.min(10, Math.max(1, maxActiveHabits + delta));
+				localStorage.setItem('lifeos_habit_limit', maxActiveHabits);
+				updateHabitLimitDisplay();
+				saveSettingRemote('habit_limit', maxActiveHabits);
+				renderHabits();
+			}
 
 			// ── State ──
 			// habitDefs: array of { id, label, group_key, life_area, sort_order, active, identity }
@@ -2752,8 +2989,8 @@
 			// ── Activate / Deactivate ──
 			function activateHabit(id) {
 				const active = activeHabits();
-				if (active.length >= MAX_ACTIVE_HABITS) {
-					showToast(`Max ${MAX_ACTIVE_HABITS} active habits. Deactivate one first.`);
+				if (active.length >= maxActiveHabits) {
+					showToast(`Max ${maxActiveHabits} active habits. Deactivate one first.`);
 					return;
 				}
 				const h = habitDefs.find(h => h.id === id);
@@ -2784,7 +3021,7 @@
 				document.getElementById('habitIdentity').value = '';
 				document.getElementById('habitGroup').value = 'morning';
 				document.getElementById('habitArea').value = 'health';
-				document.getElementById('habitActive').checked = active.length < MAX_ACTIVE_HABITS;
+				document.getElementById('habitActive').checked = active.length < maxActiveHabits;
 				document.getElementById('habitDeleteBtn').style.display = 'none';
 				document.getElementById('habitDeactivateBtn').style.display = 'none';
 				document.getElementById('habitModalOverlay').classList.add('open');
@@ -2816,8 +3053,8 @@
 
 				if (active) {
 					const currentActive = activeHabits().filter(h => h.id !== editingHabitId);
-					if (currentActive.length >= MAX_ACTIVE_HABITS) {
-						showToast(`Max ${MAX_ACTIVE_HABITS} active habits. Deactivate one first.`);
+					if (currentActive.length >= maxActiveHabits) {
+						showToast(`Max ${maxActiveHabits} active habits. Deactivate one first.`);
 						return;
 					}
 				}
@@ -2860,6 +3097,7 @@
 				}
 				if (tab === 'tasks') renderWeeklyTasks();
 				if (tab === 'habits') renderHabits();
+				if (tab === 'weekly') updateTemplateBar();
 			}
 
 			// ═══════════════════════════════════════════════════════════════
@@ -2869,6 +3107,7 @@
 				updateWeekLabel();
 				renderWeekGrid();
 				updateProgress();
+				updateTemplateBar();
 				if (document.getElementById('view-daily').classList.contains('active')) {
 					if (!selectedDay) selectedDay = getTodayDay();
 					renderDaySelector();
@@ -2889,10 +3128,13 @@
 				state = loadLocalState();
 				await ensureWeekLoaded(0);
 				await initHabits();
+				await loadSettingsRemote();
 				setupHabitsRealtime();
+				setupSettingsRealtime();
 				document.getElementById('loadingOverlay').classList.add('hidden');
 				document.getElementById('appShell').style.display = 'block';
 				selectedDay = getTodayDay();
+				updateHabitLimitDisplay();
 				renderAll();
 			}
 
