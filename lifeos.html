@@ -1196,6 +1196,59 @@
 			.template-btn:hover { border-color: var(--accent); color: var(--accent); }
 			.template-btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
 			.template-btn.primary:hover { background: #2563eb; }
+
+			/* ── CATEGORY SYSTEM ── */
+			.cat-color-palette {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+			}
+			.cat-color-swatch {
+				width: 28px; height: 28px;
+				border-radius: 50%;
+				cursor: pointer;
+				border: 3px solid transparent;
+				transition: transform 0.15s;
+				flex-shrink: 0;
+			}
+			.cat-color-swatch.selected {
+				border-color: white;
+				transform: scale(1.15);
+			}
+			.cat-list-item {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				padding: 10px 14px;
+				background: var(--surface2);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				margin-bottom: 6px;
+			}
+			.cat-list-dot {
+				width: 10px; height: 10px;
+				border-radius: 50%;
+				flex-shrink: 0;
+			}
+			.cat-list-label { flex: 1; font-size: 13px; }
+			.cat-list-badge {
+				font-size: 10px;
+				color: var(--muted);
+				background: var(--surface);
+				border: 1px solid var(--border);
+				border-radius: 4px;
+				padding: 2px 6px;
+			}
+			.cat-list-edit {
+				background: transparent;
+				border: none;
+				color: var(--muted);
+				cursor: pointer;
+				font-size: 14px;
+				padding: 4px;
+				transition: color 0.2s;
+			}
+			.cat-list-edit:hover { color: var(--text); }
 		</style>
 	</head>
 	<body>
@@ -1390,6 +1443,9 @@
 
 			<!-- WEEKLY TASKS VIEW -->
 			<div class="view" id="view-tasks">
+				<div style="display:flex;justify-content:flex-end;padding:12px 16px 0">
+					<button class="template-btn" onclick="openCatListModal()" style="font-size:11px">⚙ Manage categories</button>
+				</div>
 				<div class="weekly-tasks" id="weeklyTasksContainer"></div>
 			</div>
 		</div>
@@ -1446,27 +1502,13 @@
 		</div>
 
 		<!-- TASK MODAL -->
-		<div
-			class="modal-overlay"
-			id="taskModalOverlay"
-			onclick="closeTaskModal(event)"
-		>
+		<div class="modal-overlay" id="taskModalOverlay" onclick="closeTaskModal(event)">
 			<div class="modal">
 				<div class="modal-handle"></div>
 				<div class="modal-title">Add Weekly Goal</div>
-				<input
-					type="text"
-					id="taskLabel"
-					placeholder="e.g. Upload Master's activities to platform"
-				/>
+				<input type="text" id="taskLabel" placeholder="e.g. Upload Master's activities to platform" />
 				<select id="taskCategory">
-					<option value="startup">🚀 Startup</option>
-					<option value="masters">📚 Master's</option>
-					<option value="work">💼 Work</option>
-					<option value="family">👨‍👩‍👦 Family</option>
-					<option value="health">💪 Health</option>
-					<option value="religious">📖 Religious</option>
-					<option value="financial">💰 Financial</option>
+					<!-- populated dynamically -->
 				</select>
 				<select id="taskDay">
 					<option value="any">Any day</option>
@@ -1479,15 +1521,30 @@
 					<option value="Friday">Friday</option>
 				</select>
 				<div class="modal-btns">
-					<button
-						class="btn btn-secondary"
-						onclick="closeTaskModalDirect()"
-					>
-						Cancel
-					</button>
-					<button class="btn btn-primary" onclick="saveWeeklyTask()">
-						Add Goal
-					</button>
+					<button class="btn btn-secondary" onclick="closeTaskModalDirect()">Cancel</button>
+					<button class="btn btn-primary" onclick="saveWeeklyTask()">Add Goal</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- CATEGORY MANAGE MODAL -->
+		<div class="modal-overlay" id="catModalOverlay" onclick="closeCatModal(event)">
+			<div class="modal">
+				<div class="modal-handle"></div>
+				<div class="modal-title" id="catModalTitle">Category</div>
+				<input type="text" id="catLabel" placeholder="Category name (e.g. Doctorat Prep)" />
+				<div style="margin-bottom:10px">
+					<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Icon (emoji)</div>
+					<input type="text" id="catIcon" placeholder="e.g. 🎓" style="width:80px;text-align:center;font-size:18px" />
+				</div>
+				<div style="margin-bottom:10px">
+					<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Color</div>
+					<div class="cat-color-palette" id="catColorPalette"></div>
+				</div>
+				<div class="modal-btns">
+					<button class="btn btn-secondary" onclick="closeCatModalDirect()">Cancel</button>
+					<button class="btn btn-danger" id="catDeleteBtn" onclick="deleteCategoryModal()" style="display:none">Delete</button>
+					<button class="btn btn-primary" onclick="saveCategoryModal()">Save</button>
 				</div>
 			</div>
 		</div>
@@ -2399,67 +2456,306 @@
 			}
 
 			// ═══════════════════════════════════════════════════════════════
+			// CATEGORIES ENGINE
+			// ═══════════════════════════════════════════════════════════════
+
+			const CATEGORY_COLORS = [
+				'#10b981','#6366f1','#3b82f6','#f59e0b','#06b6d4',
+				'#f97316','#ec4899','#fbbf24','#84cc16','#8b5cf6',
+				'#ef4444','#14b8a6','#a855f7','#0ea5e9','#d946ef',
+				'#64748b','#78716c','#dc2626'
+			];
+
+			const SEED_CATEGORIES = [
+				{ id:'cat_startup',  label:'Startup',    icon:'🚀', color:'#10b981', sort_order:0,  is_default:true  },
+				{ id:'cat_masters',  label:"Master's",   icon:'📚', color:'#6366f1', sort_order:1,  is_default:true  },
+				{ id:'cat_work',     label:'Work',        icon:'💼', color:'#3b82f6', sort_order:2,  is_default:true  },
+				{ id:'cat_family',   label:'Family',      icon:'👨‍👩‍👦', color:'#f59e0b', sort_order:3,  is_default:true  },
+				{ id:'cat_health',   label:'Health',      icon:'💪', color:'#84cc16', sort_order:4,  is_default:true  },
+				{ id:'cat_religious',label:'Religious',   icon:'📖', color:'#ec4899', sort_order:5,  is_default:true  },
+				{ id:'cat_financial',label:'Financial',   icon:'💰', color:'#f97316', sort_order:6,  is_default:true  },
+				{ id:'cat_review',   label:'Review',      icon:'✅', color:'#8b5cf6', sort_order:7,  is_default:true  },
+			];
+
+			let categories = [];
+
+			function getCatById(id) {
+				return categories.find(c => c.id === id);
+			}
+
+			function getCatColor(id) {
+				const c = getCatById(id);
+				// fallback: check old CAT_COLORS for legacy task data
+				return c?.color || CAT_COLORS[id] || '#3b82f6';
+			}
+
+			function getCatLabel(id) {
+				const c = getCatById(id);
+				return c ? `${c.icon} ${c.label}` : id;
+			}
+
+			// ── Persistence ──
+			function saveCategoriesLocal() {
+				try { localStorage.setItem('lifeos_categories', JSON.stringify(categories)); } catch(e) {}
+			}
+
+			function loadCategoriesLocal() {
+				try {
+					const raw = localStorage.getItem('lifeos_categories');
+					if (raw) { categories = JSON.parse(raw); return true; }
+				} catch(e) {}
+				return false;
+			}
+
+			async function saveCategoriesRemote() {
+				if (!supabaseReady) return;
+				clearTimeout(window._catSaveTimer);
+				window._catSaveTimer = setTimeout(async () => {
+					try {
+						const upserts = categories.map(c => ({ ...c, device_id: DEVICE_ID, updated_at: new Date().toISOString() }));
+						await sb.from('lifeos_categories').upsert(upserts, { onConflict: 'id' });
+					} catch(e) {}
+				}, 800);
+			}
+
+			async function loadCategoriesRemote() {
+				if (!supabaseReady) return;
+				try {
+					const { data } = await sb.from('lifeos_categories').select('*').order('sort_order');
+					if (data?.length) {
+						categories = data;
+						saveCategoriesLocal();
+					}
+				} catch(e) {}
+			}
+
+			async function initCategories() {
+				loadCategoriesLocal();
+				await loadCategoriesRemote();
+				if (!categories.length) {
+					categories = SEED_CATEGORIES.map(c => ({ ...c }));
+					saveCategoriesLocal();
+					await saveCategoriesRemote();
+				}
+				populateCategorySelects();
+			}
+
+			function setupCategoriesRealtime() {
+				if (!supabaseReady) return;
+				sb.channel('lifeos-categories-rt')
+					.on('postgres_changes', { event: '*', schema: 'public', table: 'lifeos_categories' }, (payload) => {
+						if (payload.new?.device_id === DEVICE_ID) return;
+						const incoming = payload.new;
+						if (!incoming?.id) return;
+						const idx = categories.findIndex(c => c.id === incoming.id);
+						if (idx > -1) categories[idx] = incoming;
+						else categories.push(incoming);
+						categories.sort((a,b) => a.sort_order - b.sort_order);
+						saveCategoriesLocal();
+						populateCategorySelects();
+						if (document.getElementById('view-tasks').classList.contains('active')) renderWeeklyTasks();
+						showToast('Categories updated from another device');
+					}).subscribe();
+			}
+
+			// ── Populate dropdowns ──
+			function populateCategorySelects() {
+				const opts = categories
+					.sort((a,b) => a.sort_order - b.sort_order)
+					.map(c => `<option value="${c.id}">${c.icon} ${c.label}</option>`)
+					.join('');
+				const taskSel = document.getElementById('taskCategory');
+				const habitSel = document.getElementById('habitArea');
+				if (taskSel) taskSel.innerHTML = opts;
+				// Habit area also gets categories
+				if (habitSel) habitSel.innerHTML = opts;
+			}
+
+			// ── Category management modal ──
+			let editingCatId = null;
+			let selectedCatColor = CATEGORY_COLORS[0];
+
+			function openCatListModal() {
+				// Show list of all categories in the category modal
+				document.getElementById('catModalTitle').textContent = 'Manage Categories';
+				const palette = document.getElementById('catColorPalette');
+				const labelEl = document.getElementById('catLabel');
+				const iconEl = document.getElementById('catIcon');
+				const deleteBtn = document.getElementById('catDeleteBtn');
+
+				// Render as a list instead of edit form
+				labelEl.style.display = 'none';
+				iconEl.parentElement.style.display = 'none';
+				palette.parentElement.style.display = 'none';
+				deleteBtn.style.display = 'none';
+
+				// Build list HTML inside modal title area
+				const listHtml = categories.sort((a,b) => a.sort_order - b.sort_order).map(c => `
+					<div class="cat-list-item">
+						<div class="cat-list-dot" style="background:${c.color}"></div>
+						<div class="cat-list-label">${c.icon} ${c.label}</div>
+						${c.is_default ? '<span class="cat-list-badge">default</span>' : ''}
+						<button class="cat-list-edit" onclick="openEditCatModal('${c.id}')">✎</button>
+					</div>
+				`).join('');
+
+				// Inject into modal
+				const modal = document.querySelector('#catModalOverlay .modal');
+				// Remove old list if any
+				const old = modal.querySelector('.cat-list-container');
+				if (old) old.remove();
+				const listDiv = document.createElement('div');
+				listDiv.className = 'cat-list-container';
+				listDiv.innerHTML = listHtml;
+				modal.insertBefore(listDiv, modal.querySelector('.modal-btns'));
+
+				// Update save button to "Add new"
+				const btns = modal.querySelector('.modal-btns');
+				btns.innerHTML = `
+					<button class="btn btn-secondary" onclick="closeCatModalDirect()">Close</button>
+					<button class="btn btn-primary" onclick="openAddCatModal()">+ Add category</button>
+				`;
+				document.getElementById('catModalOverlay').classList.add('open');
+			}
+
+			function openAddCatModal() {
+				editingCatId = null;
+				selectedCatColor = CATEGORY_COLORS[0];
+				_showCatEditForm('Add Category', '', '', selectedCatColor, false);
+			}
+
+			function openEditCatModal(id) {
+				const c = getCatById(id);
+				if (!c) return;
+				editingCatId = id;
+				selectedCatColor = c.color;
+				_showCatEditForm('Edit Category', c.label, c.icon, c.color, !c.is_default);
+			}
+
+			function _showCatEditForm(title, label, icon, color, showDelete) {
+				document.getElementById('catModalTitle').textContent = title;
+				const labelEl = document.getElementById('catLabel');
+				const iconEl = document.getElementById('catIcon');
+				const palette = document.getElementById('catColorPalette');
+				const deleteBtn = document.getElementById('catDeleteBtn');
+
+				labelEl.style.display = '';
+				labelEl.value = label;
+				iconEl.parentElement.style.display = '';
+				iconEl.value = icon;
+				palette.parentElement.style.display = '';
+				deleteBtn.style.display = showDelete ? 'block' : 'none';
+
+				// Remove list if showing
+				const old = document.querySelector('#catModalOverlay .cat-list-container');
+				if (old) old.remove();
+
+				// Build color palette
+				palette.innerHTML = CATEGORY_COLORS.map(col => `
+					<div class="cat-color-swatch ${col === color ? 'selected' : ''}"
+						style="background:${col}"
+						onclick="selectCatColor('${col}')"></div>
+				`).join('');
+
+				// Reset save/cancel buttons
+				const modal = document.querySelector('#catModalOverlay .modal');
+				const existingBtns = modal.querySelector('.modal-btns');
+				existingBtns.innerHTML = `
+					<button class="btn btn-secondary" onclick="openCatListModal()">← Back</button>
+					${showDelete ? `<button class="btn btn-danger" id="catDeleteBtn" onclick="deleteCategoryModal()">Delete</button>` : ''}
+					<button class="btn btn-primary" onclick="saveCategoryModal()">Save</button>
+				`;
+			}
+
+			function selectCatColor(color) {
+				selectedCatColor = color;
+				document.querySelectorAll('.cat-color-swatch').forEach(s => {
+					s.classList.toggle('selected', s.style.background === color || s.style.backgroundColor === color);
+				});
+			}
+
+			async function saveCategoryModal() {
+				const label = document.getElementById('catLabel').value.trim();
+				const icon  = document.getElementById('catIcon').value.trim() || '📌';
+				if (!label) return;
+
+				if (editingCatId) {
+					const c = getCatById(editingCatId);
+					if (c) { c.label = label; c.icon = icon; c.color = selectedCatColor; }
+				} else {
+					const maxOrder = categories.length ? Math.max(...categories.map(c => c.sort_order)) + 1 : 0;
+					categories.push({ id: uid(), label, icon, color: selectedCatColor, sort_order: maxOrder, is_default: false });
+				}
+
+				saveCategoriesLocal();
+				await saveCategoriesRemote();
+				populateCategorySelects();
+				if (document.getElementById('view-tasks').classList.contains('active')) renderWeeklyTasks();
+				openCatListModal();
+			}
+
+			async function deleteCategoryModal() {
+				if (!editingCatId) return;
+				const c = getCatById(editingCatId);
+				if (!c || c.is_default) { showToast('Default categories cannot be deleted'); return; }
+				// Check if any tasks use this category
+				const allTasks = Object.values(state.weeklyTasks).flat();
+				const inUse = allTasks.some(t => t.cat === editingCatId);
+				if (inUse) { showToast('Remove all goals in this category first'); return; }
+				categories = categories.filter(c => c.id !== editingCatId);
+				if (supabaseReady) { try { await sb.from('lifeos_categories').delete().eq('id', editingCatId); } catch(e) {} }
+				saveCategoriesLocal();
+				populateCategorySelects();
+				if (document.getElementById('view-tasks').classList.contains('active')) renderWeeklyTasks();
+				closeCatModalDirect();
+			}
+
+			function closeCatModal(e) { if (e.target === document.getElementById('catModalOverlay')) closeCatModalDirect(); }
+			function closeCatModalDirect() { document.getElementById('catModalOverlay').classList.remove('open'); }
+
+			// ═══════════════════════════════════════════════════════════════
 			// WEEKLY TASKS
 			// ═══════════════════════════════════════════════════════════════
 			function renderWeeklyTasks() {
 				const tasks = getWeeklyTasks(currentWeekOffset);
-				const cats = [
-					"startup",
-					"masters",
-					"work",
-					"family",
-					"health",
-					"religious",
-					"financial",
-					"review",
-				];
-				const catLabels = {
-					startup: "🚀 Startup",
-					masters: "📚 Master's",
-					work: "💼 Work",
-					family: "👨‍👩‍👦 Family",
-					health: "💪 Health",
-					religious: "📖 Religious",
-					financial: "💰 Financial",
-					review: "✅ Review",
-				};
+				const sorted = [...categories].sort((a,b) => a.sort_order - b.sort_order);
 
-				let html = "";
-				cats.forEach((cat) => {
-					const catTasks = tasks.filter((t) => t.cat === cat);
-					if (catTasks.length === 0) return;
-					html += `<div class="section-title">${catLabels[cat] || cat}</div>`;
-					catTasks.forEach((task) => {
-						const color = CAT_COLORS[task.cat] || "#3b82f6";
+				let html = '';
+				sorted.forEach(cat => {
+					const catTasks = tasks.filter(t => t.cat === cat.id);
+					if (!catTasks.length) return;
+					html += `<div class="section-title">${cat.icon} ${cat.label}</div>`;
+					catTasks.forEach(task => {
 						html += `
-        <div class="weekly-task-row ${task.done ? "done" : ""}" onclick="toggleWeeklyTask('${task.id}')">
-          <div class="wt-dot" style="background:${color}"></div>
-          <div class="wt-label">${task.label}</div>
-          <div class="wt-day">${task.day || "Any"}</div>
-          <div class="wt-check">${task.done ? "✓" : ""}</div>
-        </div>
-      `;
+							<div class="weekly-task-row ${task.done ? 'done' : ''}" onclick="toggleWeeklyTask('${task.id}')">
+								<div class="wt-dot" style="background:${cat.color}"></div>
+								<div class="wt-label">${task.label}</div>
+								<div class="wt-day">${task.day || 'Any'}</div>
+								<div class="wt-check">${task.done ? '✓' : ''}</div>
+							</div>`;
 					});
 				});
 
-				const pendingTasks = tasks.filter((t) => !cats.includes(t.cat));
-				if (pendingTasks.length > 0) {
+				// Orphaned tasks (category was deleted or old data)
+				const knownIds = new Set(categories.map(c => c.id));
+				const legacy = { startup:'#10b981', masters:'#6366f1', work:'#3b82f6', family:'#f59e0b', health:'#84cc16', religious:'#ec4899', financial:'#f97316', review:'#8b5cf6' };
+				const orphaned = tasks.filter(t => !knownIds.has(t.cat));
+				if (orphaned.length) {
 					html += `<div class="section-title">Other</div>`;
-					pendingTasks.forEach((task) => {
+					orphaned.forEach(task => {
+						const color = legacy[task.cat] || '#3b82f6';
 						html += `
-        <div class="weekly-task-row ${task.done ? "done" : ""}" onclick="toggleWeeklyTask('${task.id}')">
-          <div class="wt-dot" style="background:#3b82f6"></div>
-          <div class="wt-label">${task.label}</div>
-          <div class="wt-day">${task.day || "Any"}</div>
-          <div class="wt-check">${task.done ? "✓" : ""}</div>
-        </div>
-      `;
+							<div class="weekly-task-row ${task.done ? 'done' : ''}" onclick="toggleWeeklyTask('${task.id}')">
+								<div class="wt-dot" style="background:${color}"></div>
+								<div class="wt-label">${task.label}</div>
+								<div class="wt-day">${task.day || 'Any'}</div>
+								<div class="wt-check">${task.done ? '✓' : ''}</div>
+							</div>`;
 					});
 				}
 
 				html += `<button class="add-task-btn" onclick="openTaskModal()" style="margin-top:16px">+ Add weekly goal</button>`;
-				document.getElementById("weeklyTasksContainer").innerHTML =
-					html;
+				document.getElementById('weeklyTasksContainer').innerHTML = html;
 			}
 
 			function toggleWeeklyTask(id) {
@@ -3135,10 +3431,12 @@
 				document.getElementById('loadingText').textContent = 'Loading your data…';
 				state = loadLocalState();
 				await ensureWeekLoaded(0);
+				await initCategories();
 				await initHabits();
 				await loadSettingsRemote();
 				setupHabitsRealtime();
 				setupSettingsRealtime();
+				setupCategoriesRealtime();
 				document.getElementById('loadingOverlay').classList.add('hidden');
 				document.getElementById('appShell').style.display = 'block';
 				selectedDay = getTodayDay();
