@@ -1215,27 +1215,110 @@
 			});
 
 			// ═══════════════════════════════════════════════════════════════
-			// SUPABASE INIT
+			// SUPABASE INIT + REALTIME
 			// ═══════════════════════════════════════════════════════════════
 			let sb = null;
 			let supabaseReady = false;
 
 			function initSupabase() {
 				if (SUPABASE_URL === "YOUR_SUPABASE_URL") {
-					// No Supabase configured — fall back to localStorage only
 					supabaseReady = false;
 					setSyncStatus("error");
 					showToast("Running in offline mode (localStorage only)");
 					return;
 				}
 				try {
-					sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+					sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+						realtime: { params: { eventsPerSecond: 10 } },
+					});
 					supabaseReady = true;
 					setSyncStatus("synced");
+					setupRealtimeSubscriptions();
 				} catch (e) {
 					supabaseReady = false;
 					setSyncStatus("error");
 				}
+			}
+
+			function setupRealtimeSubscriptions() {
+				// Listen for changes to schedule (weeks table)
+				sb.channel("lifeos-weeks-changes")
+					.on(
+						"postgres_changes",
+						{
+							event: "*",
+							schema: "public",
+							table: "lifeos_weeks",
+						},
+						(payload) => {
+							// Ignore if this was triggered by our own save (within 3 seconds)
+							if (Date.now() - lastSaveTime < 3000) return;
+							const remoteWeekKey = payload.new?.week_key;
+							if (!remoteWeekKey) return;
+							// Update state with remote data
+							if (payload.new?.schedule) {
+								if (!state.weeks[remoteWeekKey])
+									state.weeks[remoteWeekKey] = {
+										key: remoteWeekKey,
+									};
+								state.weeks[remoteWeekKey].schedule =
+									payload.new.schedule;
+								saveLocalState();
+								// Re-render if we're looking at this week
+								if (
+									remoteWeekKey ===
+									getWeekKey(currentWeekOffset)
+								) {
+									renderAll();
+									showToast(
+										"Schedule updated from another device",
+									);
+								}
+							}
+						},
+					)
+					.subscribe();
+
+				// Listen for changes to tasks/goals table
+				sb.channel("lifeos-tasks-changes")
+					.on(
+						"postgres_changes",
+						{
+							event: "*",
+							schema: "public",
+							table: "lifeos_tasks",
+						},
+						(payload) => {
+							// Ignore if this was triggered by our own save (within 3 seconds)
+							if (Date.now() - lastSaveTime < 3000) return;
+							const remoteWeekKey = payload.new?.week_key;
+							if (!remoteWeekKey) return;
+							// Update state with remote tasks
+							if (payload.new?.tasks !== undefined) {
+								state.weeklyTasks[remoteWeekKey] =
+									payload.new.tasks;
+								saveLocalState();
+								// Re-render if we're looking at this week
+								if (
+									remoteWeekKey ===
+									getWeekKey(currentWeekOffset)
+								) {
+									updateProgress();
+									if (
+										document
+											.getElementById("view-tasks")
+											.classList.contains("active")
+									) {
+										renderWeeklyTasks();
+									}
+									showToast(
+										"Goals updated from another device",
+									);
+								}
+							}
+						},
+					)
+					.subscribe();
 			}
 
 			function setSyncStatus(status) {
@@ -1484,6 +1567,9 @@
 			// Debounce timer for Supabase saves
 			let saveTimers = {};
 
+			// Track our own save timestamps to ignore our own realtime echoes
+			let lastSaveTime = 0;
+
 			function uid() {
 				return Math.random().toString(36).slice(2, 10);
 			}
@@ -1541,6 +1627,7 @@
 				if (!supabaseReady) return;
 				if (saveTimers[weekKey]) clearTimeout(saveTimers[weekKey]);
 				saveTimers[weekKey] = setTimeout(async () => {
+					lastSaveTime = Date.now();
 					setSyncStatus("syncing");
 					try {
 						const weekData = state.weeks[weekKey];
