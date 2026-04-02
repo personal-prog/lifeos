@@ -1,0 +1,2164 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+		/>
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta
+			name="apple-mobile-web-app-status-bar-style"
+			content="black-translucent"
+		/>
+		<meta name="theme-color" content="#0a0f1a" />
+		<title>LifeOS</title>
+		<link rel="manifest" href="manifest.json" />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap"
+			rel="stylesheet"
+		/>
+
+		<!-- ═══════════════════════════════════════════════════════════
+     SUPABASE CONFIG — REPLACE THESE TWO VALUES AFTER SETUP
+     ═══════════════════════════════════════════════════════════ -->
+		<script>
+			const SUPABASE_URL = "https://govuxkjwmgvmxqvgjque.supabase.co"; // e.g. https://xxxx.supabase.co
+			const SUPABASE_KEY =
+				"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdnV4a2p3bWd2bXhxdmdqcXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjI3MDgsImV4cCI6MjA5MDY5ODcwOH0.ct9IYXjtJ_tRik3seuUVNaG8IzKrxwPscT7y1FiXvuM"; // long string from Supabase dashboard
+			const PIN_CODE = "7391"; // change to your 4-digit PIN
+		</script>
+
+		<style>
+			:root {
+				--bg: #0a0f1a;
+				--surface: #111827;
+				--surface2: #1a2235;
+				--border: #1e2d42;
+				--text: #e8edf5;
+				--muted: #5a7090;
+				--accent: #3b82f6;
+				--startup: #10b981;
+				--masters: #6366f1;
+				--work: #3b82f6;
+				--family: #f59e0b;
+				--swim: #06b6d4;
+				--shop: #f97316;
+				--religious: #ec4899;
+				--prayer: #fbbf24;
+				--walk: #84cc16;
+				--review: #8b5cf6;
+				--sleep: #334155;
+				--free: #1e293b;
+			}
+
+			* {
+				box-sizing: border-box;
+				margin: 0;
+				padding: 0;
+			}
+
+			body {
+				background: var(--bg);
+				color: var(--text);
+				font-family: "DM Sans", sans-serif;
+				min-height: 100vh;
+				overflow-x: hidden;
+			}
+
+			/* ── PIN SCREEN ── */
+			#pinScreen {
+				position: fixed;
+				inset: 0;
+				background: var(--bg);
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				z-index: 9999;
+				gap: 32px;
+			}
+
+			#pinScreen.hidden {
+				display: none;
+			}
+
+			.pin-logo {
+				font-family: "Syne", sans-serif;
+				font-weight: 800;
+				font-size: 32px;
+				letter-spacing: -1px;
+			}
+			.pin-logo span {
+				color: var(--accent);
+			}
+
+			.pin-subtitle {
+				font-size: 13px;
+				color: var(--muted);
+				margin-top: -24px;
+			}
+
+			.pin-dots {
+				display: flex;
+				gap: 16px;
+			}
+
+			.pin-dot {
+				width: 14px;
+				height: 14px;
+				border-radius: 50%;
+				border: 2px solid var(--border);
+				transition: all 0.2s;
+			}
+
+			.pin-dot.filled {
+				background: var(--accent);
+				border-color: var(--accent);
+			}
+
+			.pin-dot.error {
+				background: #ef4444;
+				border-color: #ef4444;
+			}
+
+			.pin-keypad {
+				display: grid;
+				grid-template-columns: repeat(3, 72px);
+				gap: 12px;
+			}
+
+			.pin-key {
+				height: 72px;
+				background: var(--surface2);
+				border: 1px solid var(--border);
+				border-radius: 16px;
+				font-family: "Syne", sans-serif;
+				font-size: 22px;
+				font-weight: 700;
+				color: var(--text);
+				cursor: pointer;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				transition: all 0.15s;
+				user-select: none;
+				-webkit-tap-highlight-color: transparent;
+			}
+
+			.pin-key:active {
+				background: var(--accent);
+				transform: scale(0.95);
+			}
+			.pin-key.zero {
+				grid-column: 2;
+			}
+			.pin-key.del {
+				background: transparent;
+				border-color: transparent;
+				color: var(--muted);
+				font-size: 18px;
+			}
+
+			.pin-error-msg {
+				font-size: 12px;
+				color: #ef4444;
+				height: 16px;
+				transition: opacity 0.3s;
+			}
+
+			/* ── SYNC STATUS DOT ── */
+			.sync-dot {
+				width: 7px;
+				height: 7px;
+				border-radius: 50%;
+				background: var(--muted);
+				transition: background 0.3s;
+				flex-shrink: 0;
+			}
+			.sync-dot.syncing {
+				background: #f59e0b;
+				animation: pulse 1s infinite;
+			}
+			.sync-dot.synced {
+				background: #10b981;
+			}
+			.sync-dot.error {
+				background: #ef4444;
+			}
+
+			@keyframes pulse {
+				0%,
+				100% {
+					opacity: 1;
+				}
+				50% {
+					opacity: 0.4;
+				}
+			}
+
+			/* ── LOADING OVERLAY ── */
+			#loadingOverlay {
+				position: fixed;
+				inset: 0;
+				background: var(--bg);
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				z-index: 9998;
+				gap: 16px;
+			}
+			#loadingOverlay.hidden {
+				display: none;
+			}
+
+			.loading-logo {
+				font-family: "Syne", sans-serif;
+				font-weight: 800;
+				font-size: 28px;
+				letter-spacing: -0.5px;
+			}
+			.loading-logo span {
+				color: var(--accent);
+			}
+
+			.loading-spinner {
+				width: 24px;
+				height: 24px;
+				border: 2px solid var(--border);
+				border-top-color: var(--accent);
+				border-radius: 50%;
+				animation: spin 0.8s linear infinite;
+			}
+			@keyframes spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+
+			.loading-text {
+				font-size: 12px;
+				color: var(--muted);
+			}
+
+			/* ── HEADER ── */
+			.header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 16px 20px 12px;
+				border-bottom: 1px solid var(--border);
+				background: var(--surface);
+				position: sticky;
+				top: 0;
+				z-index: 100;
+			}
+
+			.header-left {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+			}
+
+			.logo {
+				font-family: "Syne", sans-serif;
+				font-weight: 800;
+				font-size: 20px;
+				letter-spacing: -0.5px;
+				color: var(--text);
+			}
+			.logo span {
+				color: var(--accent);
+			}
+
+			.week-nav {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+			}
+
+			.week-nav button {
+				background: var(--surface2);
+				border: 1px solid var(--border);
+				color: var(--text);
+				width: 32px;
+				height: 32px;
+				border-radius: 8px;
+				cursor: pointer;
+				font-size: 14px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				transition: background 0.15s;
+			}
+			.week-nav button:hover {
+				background: var(--border);
+			}
+
+			.week-label {
+				font-family: "Syne", sans-serif;
+				font-size: 13px;
+				font-weight: 600;
+				color: var(--muted);
+				min-width: 130px;
+				text-align: center;
+			}
+
+			/* ── TABS ── */
+			.tabs {
+				display: flex;
+				background: var(--surface);
+				border-bottom: 1px solid var(--border);
+				padding: 0 20px;
+			}
+
+			.tab {
+				font-family: "Syne", sans-serif;
+				font-weight: 600;
+				font-size: 13px;
+				padding: 12px 16px;
+				cursor: pointer;
+				border-bottom: 2px solid transparent;
+				color: var(--muted);
+				transition: all 0.2s;
+				letter-spacing: 0.5px;
+			}
+			.tab.active {
+				color: var(--accent);
+				border-bottom-color: var(--accent);
+			}
+
+			/* ── VIEWS ── */
+			.view {
+				display: none;
+			}
+			.view.active {
+				display: block;
+			}
+
+			/* ── WEEKLY GRID ── */
+			.week-grid-wrap {
+				padding: 16px;
+				overflow-x: auto;
+			}
+
+			.week-grid {
+				display: grid;
+				grid-template-columns: 70px repeat(7, 1fr);
+				min-width: 700px;
+				gap: 2px;
+			}
+
+			.grid-corner {
+				background: transparent;
+				padding: 8px 4px;
+			}
+
+			.day-header {
+				background: var(--surface2);
+				border-radius: 10px 10px 0 0;
+				padding: 10px 6px;
+				text-align: center;
+				border: 1px solid var(--border);
+				border-bottom: none;
+			}
+
+			.day-header .day-name {
+				font-family: "Syne", sans-serif;
+				font-weight: 700;
+				font-size: 12px;
+				color: var(--text);
+				letter-spacing: 0.5px;
+			}
+			.day-header .day-name.today {
+				color: var(--accent);
+			}
+			.day-header .day-date {
+				font-size: 11px;
+				color: var(--muted);
+				margin-top: 2px;
+			}
+			.day-header .shop-badge {
+				font-size: 10px;
+				color: var(--shop);
+				margin-top: 3px;
+				font-weight: 600;
+			}
+
+			.time-label {
+				display: flex;
+				align-items: center;
+				justify-content: flex-end;
+				padding-right: 8px;
+				font-size: 10px;
+				color: var(--muted);
+				height: 28px;
+			}
+
+			.grid-cell {
+				height: 28px;
+				border: 1px solid rgba(255, 255, 255, 0.03);
+				position: relative;
+				cursor: pointer;
+				transition: filter 0.15s;
+			}
+			.grid-cell:hover {
+				filter: brightness(1.2);
+			}
+			.grid-cell.has-task {
+				border-radius: 3px;
+			}
+
+			.cell-label {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				font-size: 9px;
+				font-weight: 600;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				max-width: 95%;
+				text-align: center;
+				pointer-events: none;
+				color: rgba(255, 255, 255, 0.9);
+				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+			}
+
+			/* ── LEGEND ── */
+			.legend {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				padding: 12px 16px;
+				border-top: 1px solid var(--border);
+				border-bottom: 1px solid var(--border);
+				background: var(--surface);
+			}
+			.legend-item {
+				display: flex;
+				align-items: center;
+				gap: 5px;
+				font-size: 11px;
+				color: var(--muted);
+			}
+			.legend-dot {
+				width: 10px;
+				height: 10px;
+				border-radius: 3px;
+				flex-shrink: 0;
+			}
+
+			/* ── DAY VIEW ── */
+			.day-selector {
+				display: flex;
+				gap: 6px;
+				padding: 12px 16px;
+				overflow-x: auto;
+				border-bottom: 1px solid var(--border);
+				scrollbar-width: none;
+			}
+			.day-selector::-webkit-scrollbar {
+				display: none;
+			}
+
+			.day-pill {
+				flex-shrink: 0;
+				background: var(--surface2);
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 6px 14px;
+				font-family: "Syne", sans-serif;
+				font-size: 12px;
+				font-weight: 600;
+				color: var(--muted);
+				cursor: pointer;
+				transition: all 0.2s;
+				white-space: nowrap;
+			}
+			.day-pill.active {
+				background: var(--accent);
+				border-color: var(--accent);
+				color: white;
+			}
+			.day-pill.today-pill {
+				border-color: var(--accent);
+				color: var(--accent);
+			}
+
+			.day-detail {
+				padding: 16px;
+			}
+
+			.day-title {
+				font-family: "Syne", sans-serif;
+				font-weight: 800;
+				font-size: 22px;
+				margin-bottom: 4px;
+			}
+			.day-subtitle {
+				font-size: 12px;
+				color: var(--muted);
+				margin-bottom: 16px;
+			}
+
+			.time-block {
+				display: flex;
+				gap: 10px;
+				margin-bottom: 6px;
+				align-items: stretch;
+			}
+
+			.time-block-time {
+				font-size: 11px;
+				color: var(--muted);
+				width: 70px;
+				flex-shrink: 0;
+				padding-top: 10px;
+				text-align: right;
+			}
+
+			.time-block-card {
+				flex: 1;
+				border-radius: 10px;
+				padding: 10px 14px;
+				position: relative;
+				min-height: 42px;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 8px;
+			}
+			.time-block-card.done {
+				opacity: 0.45;
+			}
+			.time-block-card.done .block-label {
+				text-decoration: line-through;
+			}
+
+			.block-label {
+				font-size: 13px;
+				font-weight: 500;
+				color: rgba(255, 255, 255, 0.92);
+				flex: 1;
+				line-height: 1.3;
+			}
+
+			.block-check {
+				width: 22px;
+				height: 22px;
+				border-radius: 50%;
+				border: 2px solid rgba(255, 255, 255, 0.3);
+				cursor: pointer;
+				flex-shrink: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-size: 11px;
+				transition: all 0.2s;
+				background: transparent;
+				color: white;
+			}
+			.block-check.checked {
+				background: rgba(255, 255, 255, 0.9);
+				border-color: transparent;
+				color: #0a0f1a;
+			}
+
+			.block-edit {
+				width: 22px;
+				height: 22px;
+				border-radius: 6px;
+				background: rgba(255, 255, 255, 0.1);
+				border: none;
+				cursor: pointer;
+				flex-shrink: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-size: 11px;
+				color: rgba(255, 255, 255, 0.6);
+				transition: all 0.2s;
+			}
+			.block-edit:hover {
+				background: rgba(255, 255, 255, 0.2);
+			}
+
+			.add-task-btn {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				padding: 10px 14px;
+				background: var(--surface2);
+				border: 1px dashed var(--border);
+				border-radius: 10px;
+				cursor: pointer;
+				color: var(--muted);
+				font-size: 13px;
+				width: 100%;
+				margin-top: 8px;
+				transition: all 0.2s;
+			}
+			.add-task-btn:hover {
+				border-color: var(--accent);
+				color: var(--accent);
+			}
+
+			/* ── WEEKLY TASKS ── */
+			.weekly-tasks {
+				padding: 16px;
+			}
+
+			.section-title {
+				font-family: "Syne", sans-serif;
+				font-weight: 700;
+				font-size: 13px;
+				letter-spacing: 1px;
+				color: var(--muted);
+				text-transform: uppercase;
+				margin-bottom: 12px;
+				margin-top: 20px;
+			}
+			.section-title:first-child {
+				margin-top: 0;
+			}
+
+			.weekly-task-row {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				padding: 10px 14px;
+				background: var(--surface2);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				margin-bottom: 6px;
+				cursor: pointer;
+				transition: border-color 0.2s;
+			}
+			.weekly-task-row:hover {
+				border-color: var(--accent);
+			}
+			.weekly-task-row.done {
+				opacity: 0.45;
+			}
+			.weekly-task-row.done .wt-label {
+				text-decoration: line-through;
+			}
+
+			.wt-dot {
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+				flex-shrink: 0;
+			}
+			.wt-label {
+				flex: 1;
+				font-size: 13px;
+				line-height: 1.4;
+			}
+			.wt-day {
+				font-size: 11px;
+				color: var(--muted);
+				flex-shrink: 0;
+			}
+			.wt-check {
+				width: 20px;
+				height: 20px;
+				border-radius: 50%;
+				border: 2px solid var(--border);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-size: 10px;
+				flex-shrink: 0;
+				transition: all 0.2s;
+			}
+			.weekly-task-row.done .wt-check {
+				background: var(--accent);
+				border-color: var(--accent);
+				color: white;
+			}
+
+			/* ── MODAL ── */
+			.modal-overlay {
+				position: fixed;
+				inset: 0;
+				background: rgba(0, 0, 0, 0.7);
+				z-index: 200;
+				display: none;
+				align-items: flex-end;
+				justify-content: center;
+				backdrop-filter: blur(4px);
+			}
+			.modal-overlay.open {
+				display: flex;
+			}
+
+			.modal {
+				background: var(--surface);
+				border: 1px solid var(--border);
+				border-radius: 20px 20px 0 0;
+				padding: 20px;
+				width: 100%;
+				max-width: 540px;
+				animation: slideUp 0.25s ease;
+			}
+			@keyframes slideUp {
+				from {
+					transform: translateY(100%);
+					opacity: 0;
+				}
+				to {
+					transform: translateY(0);
+					opacity: 1;
+				}
+			}
+
+			.modal-handle {
+				width: 36px;
+				height: 4px;
+				background: var(--border);
+				border-radius: 2px;
+				margin: 0 auto 16px;
+			}
+			.modal-title {
+				font-family: "Syne", sans-serif;
+				font-weight: 700;
+				font-size: 16px;
+				margin-bottom: 14px;
+			}
+
+			.modal input,
+			.modal select,
+			.modal textarea {
+				width: 100%;
+				background: var(--surface2);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 10px 12px;
+				color: var(--text);
+				font-family: "DM Sans", sans-serif;
+				font-size: 14px;
+				margin-bottom: 10px;
+				outline: none;
+				transition: border-color 0.2s;
+			}
+			.modal input:focus,
+			.modal select:focus,
+			.modal textarea:focus {
+				border-color: var(--accent);
+			}
+			.modal select option {
+				background: var(--surface2);
+			}
+
+			.modal-row {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 10px;
+			}
+			.modal-btns {
+				display: flex;
+				gap: 10px;
+				margin-top: 14px;
+			}
+
+			.btn {
+				flex: 1;
+				padding: 12px;
+				border-radius: 10px;
+				border: none;
+				cursor: pointer;
+				font-family: "Syne", sans-serif;
+				font-weight: 600;
+				font-size: 14px;
+				transition: all 0.2s;
+			}
+			.btn-primary {
+				background: var(--accent);
+				color: white;
+			}
+			.btn-primary:hover {
+				background: #2563eb;
+			}
+			.btn-secondary {
+				background: var(--surface2);
+				color: var(--text);
+				border: 1px solid var(--border);
+			}
+			.btn-danger {
+				background: #ef4444;
+				color: white;
+			}
+
+			/* ── PROGRESS BAR ── */
+			.progress-bar-wrap {
+				padding: 12px 16px;
+				background: var(--surface);
+				border-bottom: 1px solid var(--border);
+			}
+			.progress-row {
+				display: flex;
+				justify-content: space-between;
+				font-size: 11px;
+				color: var(--muted);
+				margin-bottom: 6px;
+			}
+			.progress-bar {
+				height: 4px;
+				background: var(--surface2);
+				border-radius: 2px;
+				overflow: hidden;
+			}
+			.progress-fill {
+				height: 100%;
+				background: linear-gradient(90deg, var(--accent), var(--swim));
+				border-radius: 2px;
+				transition: width 0.4s ease;
+			}
+
+			/* ── TOAST ── */
+			#toast {
+				position: fixed;
+				bottom: 24px;
+				left: 50%;
+				transform: translateX(-50%) translateY(80px);
+				background: var(--surface2);
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 10px 20px;
+				font-size: 12px;
+				color: var(--muted);
+				transition: transform 0.3s ease;
+				z-index: 9000;
+				white-space: nowrap;
+			}
+			#toast.show {
+				transform: translateX(-50%) translateY(0);
+			}
+
+			/* ── SCROLLBAR ── */
+			::-webkit-scrollbar {
+				width: 4px;
+			}
+			::-webkit-scrollbar-track {
+				background: transparent;
+			}
+			::-webkit-scrollbar-thumb {
+				background: var(--border);
+				border-radius: 2px;
+			}
+
+			@media (max-width: 480px) {
+				.week-grid {
+					min-width: 600px;
+				}
+				.cell-label {
+					font-size: 8px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<!-- ── PIN SCREEN ── -->
+		<div id="pinScreen">
+			<div>
+				<div class="pin-logo">Life<span>OS</span></div>
+				<div
+					class="pin-subtitle"
+					style="text-align: center; margin-top: 8px"
+				>
+					Enter PIN to continue
+				</div>
+			</div>
+			<div class="pin-dots" id="pinDots">
+				<div class="pin-dot" id="dot0"></div>
+				<div class="pin-dot" id="dot1"></div>
+				<div class="pin-dot" id="dot2"></div>
+				<div class="pin-dot" id="dot3"></div>
+			</div>
+			<div class="pin-error-msg" id="pinError"></div>
+			<div class="pin-keypad">
+				<div class="pin-key" onclick="pinPress('1')">1</div>
+				<div class="pin-key" onclick="pinPress('2')">2</div>
+				<div class="pin-key" onclick="pinPress('3')">3</div>
+				<div class="pin-key" onclick="pinPress('4')">4</div>
+				<div class="pin-key" onclick="pinPress('5')">5</div>
+				<div class="pin-key" onclick="pinPress('6')">6</div>
+				<div class="pin-key" onclick="pinPress('7')">7</div>
+				<div class="pin-key" onclick="pinPress('8')">8</div>
+				<div class="pin-key" onclick="pinPress('9')">9</div>
+				<div class="pin-key zero" onclick="pinPress('0')">0</div>
+				<div class="pin-key del" onclick="pinDel()">⌫</div>
+			</div>
+		</div>
+
+		<!-- ── LOADING OVERLAY ── -->
+		<div id="loadingOverlay" class="hidden">
+			<div class="loading-logo">Life<span>OS</span></div>
+			<div class="loading-spinner"></div>
+			<div class="loading-text" id="loadingText">Loading your data…</div>
+		</div>
+
+		<!-- ── APP SHELL (hidden until unlocked) ── -->
+		<div id="appShell" style="display: none">
+			<!-- HEADER -->
+			<div class="header">
+				<div class="header-left">
+					<div class="logo">Life<span>OS</span></div>
+					<div
+						class="sync-dot"
+						id="syncDot"
+						title="Sync status"
+					></div>
+				</div>
+				<div class="week-nav">
+					<button onclick="changeWeek(-1)">‹</button>
+					<div class="week-label" id="weekLabel"></div>
+					<button onclick="changeWeek(1)">›</button>
+				</div>
+			</div>
+
+			<!-- TABS -->
+			<div class="tabs">
+				<div class="tab active" onclick="switchTab('weekly')">
+					Weekly
+				</div>
+				<div class="tab" onclick="switchTab('daily')">Daily</div>
+				<div class="tab" onclick="switchTab('tasks')">
+					This Week's Goals
+				</div>
+			</div>
+
+			<!-- PROGRESS -->
+			<div class="progress-bar-wrap">
+				<div class="progress-row">
+					<span>Week Progress</span>
+					<span id="progressLabel">0 / 0 done</span>
+				</div>
+				<div class="progress-bar">
+					<div
+						class="progress-fill"
+						id="progressFill"
+						style="width: 0%"
+					></div>
+				</div>
+			</div>
+
+			<!-- WEEKLY VIEW -->
+			<div class="view active" id="view-weekly">
+				<div class="legend">
+					<div class="legend-item">
+						<div
+							class="legend-dot"
+							style="background: var(--startup)"
+						></div>
+						Startup
+					</div>
+					<div class="legend-item">
+						<div
+							class="legend-dot"
+							style="background: var(--masters)"
+						></div>
+						Master's
+					</div>
+					<div class="legend-item">
+						<div
+							class="legend-dot"
+							style="background: var(--work)"
+						></div>
+						Work
+					</div>
+					<div class="legend-item">
+						<div
+							class="legend-dot"
+							style="background: var(--family)"
+						></div>
+						Family
+					</div>
+					<div class="legend-item">
+						<div
+							class="legend-dot"
+							style="background: var(--swim)"
+						></div>
+						Swimming
+					</div>
+					<div class="legend-item">
+						<div
+							class="legend-dot"
+							style="background: var(--shop)"
+						></div>
+						Shop
+					</div>
+					<div class="legend-item">
+						<div
+							class="legend-dot"
+							style="background: var(--religious)"
+						></div>
+						Religious
+					</div>
+					<div class="legend-item">
+						<div
+							class="legend-dot"
+							style="background: var(--prayer)"
+						></div>
+						Prayer
+					</div>
+					<div class="legend-item">
+						<div
+							class="legend-dot"
+							style="background: var(--walk)"
+						></div>
+						Walk
+					</div>
+					<div class="legend-item">
+						<div
+							class="legend-dot"
+							style="background: var(--review)"
+						></div>
+						Review
+					</div>
+				</div>
+				<div class="week-grid-wrap">
+					<div class="week-grid" id="weekGrid"></div>
+				</div>
+			</div>
+
+			<!-- DAILY VIEW -->
+			<div class="view" id="view-daily">
+				<div class="day-selector" id="daySelectorRow"></div>
+				<div class="day-detail" id="dayDetail"></div>
+			</div>
+
+			<!-- WEEKLY TASKS VIEW -->
+			<div class="view" id="view-tasks">
+				<div class="weekly-tasks" id="weeklyTasksContainer"></div>
+			</div>
+		</div>
+		<!-- end appShell -->
+
+		<!-- BLOCK MODAL -->
+		<div
+			class="modal-overlay"
+			id="modalOverlay"
+			onclick="closeModal(event)"
+		>
+			<div class="modal">
+				<div class="modal-handle"></div>
+				<div class="modal-title" id="modalTitle">Edit Block</div>
+				<input type="text" id="modalLabel" placeholder="Label" />
+				<div class="modal-row">
+					<input type="time" id="modalStart" />
+					<input type="time" id="modalEnd" />
+				</div>
+				<select id="modalCategory">
+					<option value="startup">🚀 Startup</option>
+					<option value="masters">📚 Master's</option>
+					<option value="work">💼 Work</option>
+					<option value="family">👨‍👩‍👦 Family</option>
+					<option value="swim">🏊 Swimming</option>
+					<option value="shop">🏪 Shop</option>
+					<option value="religious">📖 Religious Studies</option>
+					<option value="prayer">🕌 Prayer</option>
+					<option value="walk">🚶 Walk</option>
+					<option value="review">✅ Review/Plan</option>
+					<option value="free">— Free</option>
+					<option value="sleep">💤 Sleep</option>
+				</select>
+				<div class="modal-btns">
+					<button
+						class="btn btn-secondary"
+						onclick="closeModalDirect()"
+					>
+						Cancel
+					</button>
+					<button
+						class="btn btn-danger"
+						id="deleteBtn"
+						onclick="deleteBlock()"
+						style="display: none"
+					>
+						Delete
+					</button>
+					<button class="btn btn-primary" onclick="saveBlock()">
+						Save
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- TASK MODAL -->
+		<div
+			class="modal-overlay"
+			id="taskModalOverlay"
+			onclick="closeTaskModal(event)"
+		>
+			<div class="modal">
+				<div class="modal-handle"></div>
+				<div class="modal-title">Add Weekly Goal</div>
+				<input
+					type="text"
+					id="taskLabel"
+					placeholder="e.g. Upload Master's activities to platform"
+				/>
+				<select id="taskCategory">
+					<option value="startup">🚀 Startup</option>
+					<option value="masters">📚 Master's</option>
+					<option value="work">💼 Work</option>
+					<option value="family">👨‍👩‍👦 Family</option>
+					<option value="health">💪 Health</option>
+					<option value="religious">📖 Religious</option>
+					<option value="financial">💰 Financial</option>
+				</select>
+				<select id="taskDay">
+					<option value="any">Any day</option>
+					<option value="Saturday">Saturday</option>
+					<option value="Sunday">Sunday</option>
+					<option value="Monday">Monday</option>
+					<option value="Tuesday">Tuesday</option>
+					<option value="Wednesday">Wednesday</option>
+					<option value="Thursday">Thursday</option>
+					<option value="Friday">Friday</option>
+				</select>
+				<div class="modal-btns">
+					<button
+						class="btn btn-secondary"
+						onclick="closeTaskModalDirect()"
+					>
+						Cancel
+					</button>
+					<button class="btn btn-primary" onclick="saveWeeklyTask()">
+						Add Goal
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- TOAST -->
+		<div id="toast"></div>
+
+		<!-- ═══════════════════════════════════════════
+     SUPABASE SDK
+═══════════════════════════════════════════ -->
+		<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+		<script>
+			// ═══════════════════════════════════════════════════════════════
+			// PIN LOGIC
+			// ═══════════════════════════════════════════════════════════════
+			let pinEntry = "";
+			const SESSION_KEY = "lifeos_session";
+
+			function checkSession() {
+				const ts = sessionStorage.getItem(SESSION_KEY);
+				if (ts && Date.now() - parseInt(ts) < 8 * 60 * 60 * 1000) {
+					unlockApp();
+				}
+			}
+
+			function pinPress(digit) {
+				if (pinEntry.length >= 4) return;
+				pinEntry += digit;
+				updatePinDots();
+				if (pinEntry.length === 4) {
+					setTimeout(checkPin, 120);
+				}
+			}
+
+			function pinDel() {
+				pinEntry = pinEntry.slice(0, -1);
+				updatePinDots();
+				document.getElementById("pinError").textContent = "";
+			}
+
+			function updatePinDots() {
+				for (let i = 0; i < 4; i++) {
+					const dot = document.getElementById("dot" + i);
+					dot.classList.toggle("filled", i < pinEntry.length);
+					dot.classList.remove("error");
+				}
+			}
+
+			function checkPin() {
+				if (pinEntry === PIN_CODE) {
+					sessionStorage.setItem(SESSION_KEY, Date.now().toString());
+					document
+						.getElementById("pinScreen")
+						.classList.add("hidden");
+					unlockApp();
+				} else {
+					for (let i = 0; i < 4; i++)
+						document
+							.getElementById("dot" + i)
+							.classList.add("error");
+					document.getElementById("pinError").textContent =
+						"Wrong PIN. Try again.";
+					setTimeout(() => {
+						pinEntry = "";
+						updatePinDots();
+					}, 800);
+				}
+			}
+
+			// Keyboard support for PIN
+			document.addEventListener("keydown", (e) => {
+				if (
+					document
+						.getElementById("pinScreen")
+						.classList.contains("hidden")
+				)
+					return;
+				if (e.key >= "0" && e.key <= "9") pinPress(e.key);
+				if (e.key === "Backspace") pinDel();
+			});
+
+			// ═══════════════════════════════════════════════════════════════
+			// SUPABASE INIT
+			// ═══════════════════════════════════════════════════════════════
+			let sb = null;
+			let supabaseReady = false;
+
+			function initSupabase() {
+				if (SUPABASE_URL === "YOUR_SUPABASE_URL") {
+					// No Supabase configured — fall back to localStorage only
+					supabaseReady = false;
+					setSyncStatus("error");
+					showToast("Running in offline mode (localStorage only)");
+					return;
+				}
+				try {
+					sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+					supabaseReady = true;
+					setSyncStatus("synced");
+				} catch (e) {
+					supabaseReady = false;
+					setSyncStatus("error");
+				}
+			}
+
+			function setSyncStatus(status) {
+				const dot = document.getElementById("syncDot");
+				if (!dot) return;
+				dot.className = "sync-dot " + status;
+				dot.title =
+					status === "synced"
+						? "Synced"
+						: status === "syncing"
+							? "Syncing…"
+							: "Sync error (offline mode)";
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// CONSTANTS
+			// ═══════════════════════════════════════════════════════════════
+			const DAYS = [
+				"Saturday",
+				"Sunday",
+				"Monday",
+				"Tuesday",
+				"Wednesday",
+				"Thursday",
+				"Friday",
+			];
+			const CAT_COLORS = {
+				startup: "#10b981",
+				masters: "#6366f1",
+				work: "#3b82f6",
+				family: "#f59e0b",
+				swim: "#06b6d4",
+				shop: "#f97316",
+				religious: "#ec4899",
+				prayer: "#fbbf24",
+				walk: "#84cc16",
+				review: "#8b5cf6",
+				free: "#1e293b",
+				sleep: "#334155",
+			};
+
+			function getSlots() {
+				const s = [];
+				for (let h = 4; h <= 22; h++)
+					for (let m = 0; m < 60; m += 30) {
+						if (h === 22 && m === 30) break;
+						s.push(
+							`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+						);
+					}
+				return s;
+			}
+			const TIME_SLOTS = getSlots();
+
+			// ═══════════════════════════════════════════════════════════════
+			// DEFAULT SCHEDULE
+			// ═══════════════════════════════════════════════════════════════
+			function defaultBlocks() {
+				const schedule = {};
+				DAYS.forEach((d) => (schedule[d] = []));
+				function add(day, start, end, label, cat) {
+					schedule[day].push({
+						id: uid(),
+						start,
+						end,
+						label,
+						cat,
+						done: false,
+					});
+				}
+				// SATURDAY
+				add("Saturday", "05:00", "05:15", "Fajr Prayer", "prayer");
+				add("Saturday", "05:15", "05:45", "Morning Walk", "walk");
+				add(
+					"Saturday",
+					"05:45",
+					"09:00",
+					"Startup Deep Work 🚀",
+					"startup",
+				);
+				add("Saturday", "09:00", "11:00", "Family Time", "family");
+				add("Saturday", "11:00", "22:00", "Shop", "shop");
+				add(
+					"Saturday",
+					"22:00",
+					"22:30",
+					"Weekly Review + Plan",
+					"review",
+				);
+				// SUNDAY
+				add("Sunday", "05:00", "05:15", "Fajr Prayer", "prayer");
+				add("Sunday", "05:15", "05:45", "Morning Walk", "walk");
+				add(
+					"Sunday",
+					"05:45",
+					"07:30",
+					"Startup Deep Work 🚀",
+					"startup",
+				);
+				add("Sunday", "08:00", "16:00", "Work + English", "work");
+				add("Sunday", "16:30", "20:00", "Shop", "shop");
+				add("Sunday", "20:00", "20:15", "Isha Prayer", "prayer");
+				add(
+					"Sunday",
+					"20:15",
+					"21:45",
+					"Religious Studies",
+					"religious",
+				);
+				add("Sunday", "22:00", "22:30", "Plan Tomorrow", "review");
+				// MONDAY
+				add("Monday", "05:00", "05:15", "Fajr Prayer", "prayer");
+				add("Monday", "05:15", "05:45", "Morning Walk", "walk");
+				add(
+					"Monday",
+					"05:45",
+					"07:30",
+					"Startup Deep Work 🚀",
+					"startup",
+				);
+				add("Monday", "08:00", "16:00", "Work + English", "work");
+				add("Monday", "16:30", "20:00", "Shop", "shop");
+				add("Monday", "20:00", "20:15", "Isha Prayer", "prayer");
+				add("Monday", "20:15", "21:45", "Master's Study", "masters");
+				add("Monday", "22:00", "22:30", "Plan Tomorrow", "review");
+				// TUESDAY
+				add("Tuesday", "05:00", "05:15", "Fajr Prayer", "prayer");
+				add("Tuesday", "05:15", "05:45", "Morning Walk", "walk");
+				add(
+					"Tuesday",
+					"05:45",
+					"07:30",
+					"Startup Deep Work 🚀",
+					"startup",
+				);
+				add("Tuesday", "08:00", "16:00", "Work + English", "work");
+				add("Tuesday", "16:00", "18:15", "Family Time", "family");
+				add("Tuesday", "18:30", "20:00", "Swimming 🏊", "swim");
+				add("Tuesday", "20:00", "20:15", "Isha Prayer", "prayer");
+				add("Tuesday", "20:15", "21:45", "Master's Study", "masters");
+				add("Tuesday", "22:00", "22:30", "Plan Tomorrow", "review");
+				// WEDNESDAY
+				add("Wednesday", "05:00", "05:15", "Fajr Prayer", "prayer");
+				add("Wednesday", "05:15", "05:45", "Morning Walk", "walk");
+				add("Wednesday", "05:45", "07:30", "Master's Study", "masters");
+				add("Wednesday", "08:00", "16:00", "Work + English", "work");
+				add("Wednesday", "16:00", "19:45", "Family Time", "family");
+				add("Wednesday", "20:00", "20:15", "Isha Prayer", "prayer");
+				add(
+					"Wednesday",
+					"20:15",
+					"21:45",
+					"Religious Studies",
+					"religious",
+				);
+				add("Wednesday", "22:00", "22:30", "Plan Tomorrow", "review");
+				// THURSDAY
+				add("Thursday", "05:00", "05:15", "Fajr Prayer", "prayer");
+				add("Thursday", "05:15", "05:45", "Morning Walk", "walk");
+				add("Thursday", "05:45", "07:30", "Master's Study", "masters");
+				add("Thursday", "08:00", "16:00", "Work + English", "work");
+				add("Thursday", "16:00", "19:45", "Family Time", "family");
+				add("Thursday", "20:00", "20:15", "Isha Prayer", "prayer");
+				add(
+					"Thursday",
+					"20:15",
+					"21:45",
+					"Religious Studies",
+					"religious",
+				);
+				add("Thursday", "22:00", "22:30", "Plan Tomorrow", "review");
+				// FRIDAY
+				add("Friday", "05:00", "05:15", "Fajr Prayer", "prayer");
+				add("Friday", "05:15", "05:45", "Morning Walk", "walk");
+				add(
+					"Friday",
+					"05:45",
+					"07:30",
+					"Startup Deep Work 🚀",
+					"startup",
+				);
+				add("Friday", "07:30", "12:00", "Family Time + Rest", "family");
+				add("Friday", "12:00", "12:30", "Jumu'ah Prayer", "prayer");
+				add("Friday", "12:30", "19:45", "Family Time", "family");
+				add("Friday", "20:00", "21:30", "Swimming 🏊", "swim");
+				add("Friday", "21:30", "22:30", "Rest + Plan", "review");
+				return schedule;
+			}
+
+			function getDefaultWeeklyTasks() {
+				return [
+					{
+						id: uid(),
+						label: "Upload Master's activities to platform (due Apr 10)",
+						cat: "masters",
+						day: "Wednesday",
+						done: false,
+					},
+					{
+						id: uid(),
+						label: "Contact supervisor — confirm meeting day this week",
+						cat: "startup",
+						day: "Wednesday",
+						done: false,
+					},
+					{
+						id: uid(),
+						label: "Write precise questions for supervisor meeting",
+						cat: "startup",
+						day: "Thursday",
+						done: false,
+					},
+					{
+						id: uid(),
+						label: "Open Module 1 — read first section, check for activity",
+						cat: "masters",
+						day: "Thursday",
+						done: false,
+					},
+					{
+						id: uid(),
+						label: "Open Module 2 — read first section, check for activity",
+						cat: "masters",
+						day: "Friday",
+						done: false,
+					},
+					{
+						id: uid(),
+						label: "Build weekly plan for next week (Saturday review)",
+						cat: "review",
+						day: "Saturday",
+						done: false,
+					},
+				];
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// STATE & PERSISTENCE
+			// ═══════════════════════════════════════════════════════════════
+			let currentWeekOffset = 0;
+			let selectedDay = null;
+			let editingBlock = null;
+			let editingDay = null;
+			let state = { weeks: {}, weeklyTasks: {} };
+
+			// Debounce timer for Supabase saves
+			let saveTimers = {};
+
+			function uid() {
+				return Math.random().toString(36).slice(2, 10);
+			}
+
+			function getWeekKey(offset) {
+				const d = new Date();
+				d.setDate(d.getDate() + offset * 7);
+				const sat = new Date(d);
+				sat.setDate(d.getDate() - ((d.getDay() + 1) % 7));
+				return sat.toISOString().slice(0, 10);
+			}
+
+			// LOCAL STORAGE
+			function loadLocalState() {
+				try {
+					const raw = localStorage.getItem("lifeos_v2");
+					if (raw) return JSON.parse(raw);
+				} catch (e) {}
+				return { weeks: {}, weeklyTasks: {} };
+			}
+
+			function saveLocalState() {
+				try {
+					localStorage.setItem("lifeos_v2", JSON.stringify(state));
+				} catch (e) {}
+			}
+
+			// SUPABASE READ
+			async function loadFromSupabase(weekKey) {
+				if (!supabaseReady) return null;
+				try {
+					const [wRes, tRes] = await Promise.all([
+						sb
+							.from("lifeos_weeks")
+							.select("*")
+							.eq("week_key", weekKey)
+							.single(),
+						sb
+							.from("lifeos_tasks")
+							.select("*")
+							.eq("week_key", weekKey)
+							.single(),
+					]);
+					const result = {};
+					if (wRes.data) result.schedule = wRes.data.schedule;
+					if (tRes.data) result.tasks = tRes.data.tasks;
+					return result;
+				} catch (e) {
+					return null;
+				}
+			}
+
+			// SUPABASE WRITE (debounced)
+			async function saveToSupabase(weekKey) {
+				if (!supabaseReady) return;
+				if (saveTimers[weekKey]) clearTimeout(saveTimers[weekKey]);
+				saveTimers[weekKey] = setTimeout(async () => {
+					setSyncStatus("syncing");
+					try {
+						const weekData = state.weeks[weekKey];
+						const taskData = state.weeklyTasks[weekKey];
+						const ops = [];
+						if (weekData) {
+							ops.push(
+								sb.from("lifeos_weeks").upsert(
+									{
+										week_key: weekKey,
+										schedule: weekData.schedule,
+										updated_at: new Date().toISOString(),
+									},
+									{ onConflict: "week_key" },
+								),
+							);
+						}
+						if (taskData !== undefined) {
+							ops.push(
+								sb.from("lifeos_tasks").upsert(
+									{
+										week_key: weekKey,
+										tasks: taskData,
+										updated_at: new Date().toISOString(),
+									},
+									{ onConflict: "week_key" },
+								),
+							);
+						}
+						await Promise.all(ops);
+						setSyncStatus("synced");
+					} catch (e) {
+						setSyncStatus("error");
+						showToast("Sync failed — saved locally");
+					}
+				}, 1200);
+			}
+
+			function saveState(weekKey) {
+				const key = weekKey || getWeekKey(currentWeekOffset);
+				saveLocalState();
+				saveToSupabase(key);
+			}
+
+			// LOAD WEEK DATA (local first, then Supabase if missing)
+			async function ensureWeekLoaded(offset) {
+				const key = getWeekKey(offset);
+				if (state.weeks[key]) return; // already in memory
+
+				// Try to load from Supabase
+				if (supabaseReady) {
+					setSyncStatus("syncing");
+					const remote = await loadFromSupabase(key);
+					if (remote && remote.schedule) {
+						state.weeks[key] = { schedule: remote.schedule, key };
+						if (remote.tasks !== undefined) {
+							state.weeklyTasks[key] = remote.tasks;
+						}
+						saveLocalState();
+						setSyncStatus("synced");
+						return;
+					}
+					setSyncStatus("synced");
+				}
+
+				// Fall back to local
+				if (!state.weeks[key]) {
+					const isCurrentWeek = offset === 0;
+					state.weeks[key] = { schedule: defaultBlocks(), key };
+					if (!state.weeklyTasks[key]) {
+						state.weeklyTasks[key] = isCurrentWeek
+							? getDefaultWeeklyTasks()
+							: [];
+					}
+					saveLocalState();
+					saveToSupabase(key);
+				}
+			}
+
+			function getWeekData(offset) {
+				const key = getWeekKey(offset);
+				if (!state.weeks[key]) {
+					state.weeks[key] = { schedule: defaultBlocks(), key };
+					saveState(key);
+				}
+				return state.weeks[key];
+			}
+
+			function getWeeklyTasks(offset) {
+				const key = getWeekKey(offset);
+				if (!state.weeklyTasks[key]) {
+					state.weeklyTasks[key] =
+						offset === 0 ? getDefaultWeeklyTasks() : [];
+					saveState(key);
+				}
+				return state.weeklyTasks[key];
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// HELPERS
+			// ═══════════════════════════════════════════════════════════════
+			function timeToMin(t) {
+				const [h, m] = t.split(":").map(Number);
+				return h * 60 + m;
+			}
+			function minToTime(m) {
+				return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+			}
+			function formatTime12(t) {
+				const [h, m] = t.split(":").map(Number);
+				const ap = h < 12 ? "AM" : "PM";
+				const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+				return `${h12}:${String(m).padStart(2, "0")} ${ap}`;
+			}
+			function getTodayDay() {
+				const days = [
+					"Sunday",
+					"Monday",
+					"Tuesday",
+					"Wednesday",
+					"Thursday",
+					"Friday",
+					"Saturday",
+				];
+				return days[new Date().getDay()];
+			}
+			function getWeekDates(offset) {
+				const today = new Date();
+				const dayOfWeek = today.getDay();
+				const daysToSat = (dayOfWeek + 1) % 7;
+				const sat = new Date(today);
+				sat.setDate(today.getDate() - daysToSat + offset * 7);
+				return DAYS.map((d, i) => {
+					const date = new Date(sat);
+					date.setDate(sat.getDate() + i);
+					return date;
+				});
+			}
+
+			function showToast(msg, duration = 3000) {
+				const t = document.getElementById("toast");
+				t.textContent = msg;
+				t.classList.add("show");
+				setTimeout(() => t.classList.remove("show"), duration);
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// WEEK LABEL & NAV
+			// ═══════════════════════════════════════════════════════════════
+			function updateWeekLabel() {
+				const dates = getWeekDates(currentWeekOffset);
+				const fmt = (d) => `${d.getDate()}/${d.getMonth() + 1}`;
+				const label =
+					currentWeekOffset === 0
+						? `This Week`
+						: currentWeekOffset === 1
+							? `Next Week`
+							: currentWeekOffset === -1
+								? `Last Week`
+								: `${fmt(dates[0])} – ${fmt(dates[6])}`;
+				document.getElementById("weekLabel").textContent = label;
+			}
+
+			async function changeWeek(dir) {
+				currentWeekOffset += dir;
+				updateWeekLabel();
+				// Show loading briefly if we need to fetch
+				const key = getWeekKey(currentWeekOffset);
+				if (!state.weeks[key] && supabaseReady) {
+					document.getElementById("weekGrid").innerHTML =
+						'<div style="padding:24px;color:var(--muted);font-size:13px">Loading week…</div>';
+				}
+				await ensureWeekLoaded(currentWeekOffset);
+				renderAll();
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// PROGRESS
+			// ═══════════════════════════════════════════════════════════════
+			function updateProgress() {
+				const tasks = getWeeklyTasks(currentWeekOffset);
+				const total = tasks.length;
+				const done = tasks.filter((t) => t.done).length;
+				const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+				document.getElementById("progressLabel").textContent =
+					`${done} / ${total} done`;
+				document.getElementById("progressFill").style.width = pct + "%";
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// WEEKLY GRID
+			// ═══════════════════════════════════════════════════════════════
+			function renderWeekGrid() {
+				const grid = document.getElementById("weekGrid");
+				const data = getWeekData(currentWeekOffset);
+				const dates = getWeekDates(currentWeekOffset);
+				const todayDay = getTodayDay();
+
+				const slotMap = {};
+				DAYS.forEach((day) => {
+					slotMap[day] = {};
+					(data.schedule[day] || []).forEach((block) => {
+						let cur = timeToMin(block.start);
+						const end = timeToMin(block.end);
+						while (cur < end) {
+							slotMap[day][minToTime(cur)] = block;
+							cur += 30;
+						}
+					});
+				});
+
+				let html = '<div class="grid-corner"></div>';
+				DAYS.forEach((day, i) => {
+					const date = dates[i];
+					const isToday = day === todayDay && currentWeekOffset === 0;
+					const isYourShop = [
+						"Saturday",
+						"Sunday",
+						"Monday",
+					].includes(day);
+					html += `<div class="day-header" onclick="selectDayFromGrid('${day}')">
+      <div class="day-name ${isToday ? "today" : ""}">${day.slice(0, 3).toUpperCase()}</div>
+      <div class="day-date">${date.getDate()}/${date.getMonth() + 1}</div>
+      ${isYourShop ? '<div class="shop-badge">Your night</div>' : ""}
+    </div>`;
+				});
+
+				TIME_SLOTS.forEach((slot) => {
+					html += `<div class="time-label">${formatTime12(slot).replace(" AM", "").replace(" PM", "")}</div>`;
+					DAYS.forEach((day) => {
+						const block = slotMap[day][slot];
+						const color = block
+							? CAT_COLORS[block.cat]
+							: "transparent";
+						const label = block ? block.label : "";
+						html += `<div class="grid-cell has-task"
+        style="background:${color}; opacity:${block?.done ? 0.4 : 1}"
+        onclick="openBlockModal('${day}','${slot}')"
+        title="${label}">
+        <span class="cell-label">${label}</span>
+      </div>`;
+					});
+				});
+
+				grid.innerHTML = html;
+			}
+
+			function selectDayFromGrid(day) {
+				selectedDay = day;
+				switchTab("daily");
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// DAILY VIEW
+			// ═══════════════════════════════════════════════════════════════
+			function renderDaySelector() {
+				const todayDay = getTodayDay();
+				const dates = getWeekDates(currentWeekOffset);
+				let html = "";
+				DAYS.forEach((day, i) => {
+					const isToday = day === todayDay && currentWeekOffset === 0;
+					const isActive = day === selectedDay;
+					html += `<div class="day-pill ${isActive ? "active" : ""} ${isToday && !isActive ? "today-pill" : ""}"
+      onclick="selectDay('${day}')">${day.slice(0, 3)} ${dates[i].getDate()}</div>`;
+				});
+				document.getElementById("daySelectorRow").innerHTML = html;
+			}
+
+			function selectDay(day) {
+				selectedDay = day;
+				renderDaySelector();
+				renderDayDetail();
+			}
+
+			function renderDayDetail() {
+				const data = getWeekData(currentWeekOffset);
+				const blocks = (data.schedule[selectedDay] || []).sort(
+					(a, b) => timeToMin(a.start) - timeToMin(b.start),
+				);
+				const dates = getWeekDates(currentWeekOffset);
+				const dayIdx = DAYS.indexOf(selectedDay);
+				const date = dates[dayIdx];
+				const isYourShop = ["Saturday", "Sunday", "Monday"].includes(
+					selectedDay,
+				);
+
+				let html = `
+    <div class="day-title">${selectedDay}</div>
+    <div class="day-subtitle">${date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
+    ${isYourShop ? ' · <span style="color:var(--shop)">Your shop night</span>' : ' · <span style="color:var(--muted)">Partner\'s shop night</span>'}</div>
+  `;
+
+				blocks.forEach((block) => {
+					const color = CAT_COLORS[block.cat] || "#334155";
+					html += `
+      <div class="time-block">
+        <div class="time-block-time">${formatTime12(block.start)}<br><span style="color:var(--muted);font-size:10px">${formatTime12(block.end)}</span></div>
+        <div class="time-block-card ${block.done ? "done" : ""}" style="background:${color}22; border-left: 3px solid ${color}">
+          <div class="block-label">${block.label}</div>
+          <button class="block-edit" onclick="openBlockEditModal('${selectedDay}','${block.id}')">✎</button>
+          <button class="block-check ${block.done ? "checked" : ""}" onclick="toggleBlock('${selectedDay}','${block.id}')">${block.done ? "✓" : ""}</button>
+        </div>
+      </div>
+    `;
+				});
+
+				html += `<button class="add-task-btn" onclick="openNewBlockModal('${selectedDay}')">+ Add block for ${selectedDay}</button>`;
+				document.getElementById("dayDetail").innerHTML = html;
+			}
+
+			function toggleBlock(day, id) {
+				const data = getWeekData(currentWeekOffset);
+				const block = data.schedule[day].find((b) => b.id === id);
+				if (block) {
+					block.done = !block.done;
+					saveState();
+					renderDayDetail();
+					renderWeekGrid();
+				}
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// WEEKLY TASKS
+			// ═══════════════════════════════════════════════════════════════
+			function renderWeeklyTasks() {
+				const tasks = getWeeklyTasks(currentWeekOffset);
+				const cats = [
+					"startup",
+					"masters",
+					"work",
+					"family",
+					"health",
+					"religious",
+					"financial",
+					"review",
+				];
+				const catLabels = {
+					startup: "🚀 Startup",
+					masters: "📚 Master's",
+					work: "💼 Work",
+					family: "👨‍👩‍👦 Family",
+					health: "💪 Health",
+					religious: "📖 Religious",
+					financial: "💰 Financial",
+					review: "✅ Review",
+				};
+
+				let html = "";
+				cats.forEach((cat) => {
+					const catTasks = tasks.filter((t) => t.cat === cat);
+					if (catTasks.length === 0) return;
+					html += `<div class="section-title">${catLabels[cat] || cat}</div>`;
+					catTasks.forEach((task) => {
+						const color = CAT_COLORS[task.cat] || "#3b82f6";
+						html += `
+        <div class="weekly-task-row ${task.done ? "done" : ""}" onclick="toggleWeeklyTask('${task.id}')">
+          <div class="wt-dot" style="background:${color}"></div>
+          <div class="wt-label">${task.label}</div>
+          <div class="wt-day">${task.day || "Any"}</div>
+          <div class="wt-check">${task.done ? "✓" : ""}</div>
+        </div>
+      `;
+					});
+				});
+
+				const pendingTasks = tasks.filter((t) => !cats.includes(t.cat));
+				if (pendingTasks.length > 0) {
+					html += `<div class="section-title">Other</div>`;
+					pendingTasks.forEach((task) => {
+						html += `
+        <div class="weekly-task-row ${task.done ? "done" : ""}" onclick="toggleWeeklyTask('${task.id}')">
+          <div class="wt-dot" style="background:#3b82f6"></div>
+          <div class="wt-label">${task.label}</div>
+          <div class="wt-day">${task.day || "Any"}</div>
+          <div class="wt-check">${task.done ? "✓" : ""}</div>
+        </div>
+      `;
+					});
+				}
+
+				html += `<button class="add-task-btn" onclick="openTaskModal()" style="margin-top:16px">+ Add weekly goal</button>`;
+				document.getElementById("weeklyTasksContainer").innerHTML =
+					html;
+			}
+
+			function toggleWeeklyTask(id) {
+				const tasks = getWeeklyTasks(currentWeekOffset);
+				const t = tasks.find((t) => t.id === id);
+				if (t) {
+					t.done = !t.done;
+					saveState();
+					renderWeeklyTasks();
+					updateProgress();
+				}
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// MODALS
+			// ═══════════════════════════════════════════════════════════════
+			function openBlockModal(day, slot) {
+				const data = getWeekData(currentWeekOffset);
+				const slotMin = timeToMin(slot);
+				const block = (data.schedule[day] || []).find(
+					(b) =>
+						timeToMin(b.start) <= slotMin &&
+						timeToMin(b.end) > slotMin,
+				);
+				if (block) {
+					openBlockEditModal(day, block.id);
+				} else {
+					openNewBlockModal(day, slot);
+				}
+			}
+
+			function openBlockEditModal(day, id) {
+				const data = getWeekData(currentWeekOffset);
+				const block = (data.schedule[day] || []).find(
+					(b) => b.id === id,
+				);
+				if (!block) return;
+				editingBlock = id;
+				editingDay = day;
+				document.getElementById("modalTitle").textContent =
+					"Edit Block";
+				document.getElementById("modalLabel").value = block.label;
+				document.getElementById("modalStart").value = block.start;
+				document.getElementById("modalEnd").value = block.end;
+				document.getElementById("modalCategory").value = block.cat;
+				document.getElementById("deleteBtn").style.display = "block";
+				document.getElementById("modalOverlay").classList.add("open");
+			}
+
+			function openNewBlockModal(day, slot) {
+				editingBlock = null;
+				editingDay = day;
+				document.getElementById("modalTitle").textContent =
+					`Add Block — ${day}`;
+				document.getElementById("modalLabel").value = "";
+				document.getElementById("modalStart").value = slot || "06:00";
+				document.getElementById("modalEnd").value = slot
+					? minToTime(timeToMin(slot) + 60)
+					: "07:00";
+				document.getElementById("modalCategory").value = "startup";
+				document.getElementById("deleteBtn").style.display = "none";
+				document.getElementById("modalOverlay").classList.add("open");
+			}
+
+			function saveBlock() {
+				const data = getWeekData(currentWeekOffset);
+				const label = document
+					.getElementById("modalLabel")
+					.value.trim();
+				const start = document.getElementById("modalStart").value;
+				const end = document.getElementById("modalEnd").value;
+				const cat = document.getElementById("modalCategory").value;
+				if (!label || !start || !end) return;
+				if (editingBlock) {
+					const block = (data.schedule[editingDay] || []).find(
+						(b) => b.id === editingBlock,
+					);
+					if (block) {
+						block.label = label;
+						block.start = start;
+						block.end = end;
+						block.cat = cat;
+					}
+				} else {
+					if (!data.schedule[editingDay])
+						data.schedule[editingDay] = [];
+					data.schedule[editingDay].push({
+						id: uid(),
+						label,
+						start,
+						end,
+						cat,
+						done: false,
+					});
+				}
+				saveState();
+				closeModalDirect();
+				renderAll();
+			}
+
+			function deleteBlock() {
+				const data = getWeekData(currentWeekOffset);
+				if (editingBlock && editingDay) {
+					data.schedule[editingDay] = (
+						data.schedule[editingDay] || []
+					).filter((b) => b.id !== editingBlock);
+					saveState();
+					closeModalDirect();
+					renderAll();
+				}
+			}
+
+			function closeModal(e) {
+				if (e.target === document.getElementById("modalOverlay"))
+					closeModalDirect();
+			}
+			function closeModalDirect() {
+				document
+					.getElementById("modalOverlay")
+					.classList.remove("open");
+			}
+
+			function openTaskModal() {
+				document.getElementById("taskLabel").value = "";
+				document
+					.getElementById("taskModalOverlay")
+					.classList.add("open");
+			}
+			function saveWeeklyTask() {
+				const label = document.getElementById("taskLabel").value.trim();
+				const cat = document.getElementById("taskCategory").value;
+				const day = document.getElementById("taskDay").value;
+				if (!label) return;
+				const tasks = getWeeklyTasks(currentWeekOffset);
+				tasks.push({
+					id: uid(),
+					label,
+					cat,
+					day: day === "any" ? "Any" : day,
+					done: false,
+				});
+				saveState();
+				closeTaskModalDirect();
+				renderWeeklyTasks();
+				updateProgress();
+			}
+			function closeTaskModal(e) {
+				if (e.target === document.getElementById("taskModalOverlay"))
+					closeTaskModalDirect();
+			}
+			function closeTaskModalDirect() {
+				document
+					.getElementById("taskModalOverlay")
+					.classList.remove("open");
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// TABS
+			// ═══════════════════════════════════════════════════════════════
+			function switchTab(tab) {
+				document.querySelectorAll(".tab").forEach((t, i) => {
+					const tabs = ["weekly", "daily", "tasks"];
+					t.classList.toggle("active", tabs[i] === tab);
+				});
+				document
+					.querySelectorAll(".view")
+					.forEach((v) => v.classList.remove("active"));
+				document.getElementById(`view-${tab}`).classList.add("active");
+				if (tab === "daily") {
+					if (!selectedDay) selectedDay = getTodayDay();
+					renderDaySelector();
+					renderDayDetail();
+				}
+				if (tab === "tasks") renderWeeklyTasks();
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// RENDER ALL
+			// ═══════════════════════════════════════════════════════════════
+			function renderAll() {
+				updateWeekLabel();
+				renderWeekGrid();
+				updateProgress();
+				if (
+					document
+						.getElementById("view-daily")
+						.classList.contains("active")
+				) {
+					if (!selectedDay) selectedDay = getTodayDay();
+					renderDaySelector();
+					renderDayDetail();
+				}
+				if (
+					document
+						.getElementById("view-tasks")
+						.classList.contains("active")
+				) {
+					renderWeeklyTasks();
+				}
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// UNLOCK & BOOT
+			// ═══════════════════════════════════════════════════════════════
+			async function unlockApp() {
+				document
+					.getElementById("loadingOverlay")
+					.classList.remove("hidden");
+				document.getElementById("loadingText").textContent =
+					"Initializing sync…";
+
+				initSupabase();
+
+				document.getElementById("loadingText").textContent =
+					"Loading your week…";
+
+				// Load from localStorage first (instant)
+				state = loadLocalState();
+
+				// Then try to pull current week from Supabase
+				await ensureWeekLoaded(0);
+
+				document
+					.getElementById("loadingOverlay")
+					.classList.add("hidden");
+				document.getElementById("appShell").style.display = "block";
+
+				selectedDay = getTodayDay();
+				renderAll();
+			}
+
+			// ═══════════════════════════════════════════════════════════════
+			// START
+			// ═══════════════════════════════════════════════════════════════
+			checkSession();
+		</script>
+	</body>
+</html>
