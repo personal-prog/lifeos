@@ -2036,33 +2036,32 @@
 				} catch(e) { return null; }
 			}
 
-			function saveAsTemplate() {
+			function setTemplateLocal(template) {
+				try { localStorage.setItem(TEMPLATE_KEY, JSON.stringify(template)); } catch(e) {}
+			}
+
+			async function saveAsTemplate() {
 				const data = getWeekData(currentWeekOffset);
-				// Deep copy schedule, strip done flags
 				const clean = {};
 				DAYS.forEach(day => {
 					clean[day] = (data.schedule[day] || []).map(b => ({
-						...b,
-						id: uid(), // fresh IDs so template blocks are independent
-						done: false
+						...b, id: uid(), done: false
 					}));
 				});
-				localStorage.setItem(TEMPLATE_KEY, JSON.stringify(clean));
+				setTemplateLocal(clean);
+				await saveSettingRemote('week_template', clean);
 				updateTemplateBar();
 				showToast('✓ Saved as your weekly template');
 			}
 
-			function applyTemplateToWeek() {
+			async function applyTemplateToWeek() {
 				const template = getTemplate();
 				if (!template) { showToast('No template saved yet'); return; }
 				const key = getWeekKey(currentWeekOffset);
-				// Deep copy with fresh IDs and done:false
 				const fresh = {};
 				DAYS.forEach(day => {
 					fresh[day] = (template[day] || []).map(b => ({
-						...b,
-						id: uid(),
-						done: false
+						...b, id: uid(), done: false
 					}));
 				});
 				state.weeks[key] = { schedule: fresh, key };
@@ -2653,6 +2652,9 @@
 								maxActiveHabits = parseInt(row.value) || MAX_ACTIVE_HABITS_DEFAULT;
 								localStorage.setItem('lifeos_habit_limit', maxActiveHabits);
 							}
+							if (row.key === 'week_template' && row.value) {
+								setTemplateLocal(row.value);
+							}
 						});
 						updateHabitLimitDisplay();
 					}
@@ -2674,12 +2676,18 @@
 				sb.channel('lifeos-settings-rt')
 					.on('postgres_changes', { event: '*', schema: 'public', table: 'lifeos_settings' }, (payload) => {
 						if (payload.new?.device_id === DEVICE_ID) return;
-						if (payload.new?.key === 'habit_limit') {
-							maxActiveHabits = parseInt(payload.new.value) || MAX_ACTIVE_HABITS_DEFAULT;
+						const { key, value } = payload.new || {};
+						if (key === 'habit_limit') {
+							maxActiveHabits = parseInt(value) || MAX_ACTIVE_HABITS_DEFAULT;
 							localStorage.setItem('lifeos_habit_limit', maxActiveHabits);
 							updateHabitLimitDisplay();
 							if (document.getElementById('view-habits').classList.contains('active')) renderHabits();
 							showToast('Habit limit updated from another device');
+						}
+						if (key === 'week_template' && value) {
+							setTemplateLocal(value);
+							updateTemplateBar();
+							showToast('Week template updated from another device');
 						}
 					}).subscribe();
 			}
