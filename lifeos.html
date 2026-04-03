@@ -3190,21 +3190,15 @@
 				if (!supabaseReady) return;
 				sb.channel('lifeos-habits-log-rt')
 					.on('postgres_changes', { event: '*', schema: 'public', table: 'lifeos_habits' }, (payload) => {
-						console.log('[habits-rt] received:', payload.new?.id, 'device:', payload.new?.device_id, 'mine:', DEVICE_ID);
-						if (payload.new?.device_id === DEVICE_ID) {
-							console.log('[habits-rt] ignored own event');
-							return;
-						}
+						if (payload.new?.device_id === DEVICE_ID) return;
 						const hid = payload.new?.id;
 						if (hid) {
 							habitsLog[hid] = { log: payload.new.log || [] };
 							try { localStorage.setItem('lifeos_habitslog', JSON.stringify(habitsLog)); } catch(e) {}
-							console.log('[habits-rt] updated log for', hid, habitsLog[hid]);
+							// Always update state — re-render only if tab is active
 							if (document.getElementById('view-habits').classList.contains('active')) renderHabits();
 						}
-					}).subscribe((status) => {
-						console.log('[habits-rt] subscription status:', status);
-					});
+					}).subscribe();
 
 				sb.channel('lifeos-habits-defs-rt')
 					.on('postgres_changes', { event: '*', schema: 'public', table: 'lifeos_habit_defs' }, (payload) => {
