@@ -691,6 +691,8 @@
 				align-items: flex-end;
 				justify-content: center;
 				backdrop-filter: blur(4px);
+				overflow-y: auto;
+				padding-top: 40px;
 			}
 			.modal-overlay.open {
 				display: flex;
@@ -704,6 +706,22 @@
 				width: 100%;
 				max-width: 540px;
 				animation: slideUp 0.25s ease;
+				flex-shrink: 0;
+				align-self: flex-end;
+			}
+
+			@media (min-height: 500px) and (min-width: 600px) {
+				.modal-overlay {
+					align-items: center;
+					padding-top: 0;
+				}
+				.modal {
+					border-radius: 20px;
+					align-self: auto;
+					margin: auto;
+					max-height: 90vh;
+					overflow-y: auto;
+				}
 			}
 			@keyframes slideUp {
 				from {
@@ -1529,23 +1547,35 @@
 
 		<!-- CATEGORY MANAGE MODAL -->
 		<div class="modal-overlay" id="catModalOverlay" onclick="closeCatModal(event)">
-			<div class="modal">
+			<div class="modal" style="max-height:85vh;overflow-y:auto">
 				<div class="modal-handle"></div>
-				<div class="modal-title" id="catModalTitle">Category</div>
-				<input type="text" id="catLabel" placeholder="Category name (e.g. Doctorat Prep)" />
-				<div style="margin-bottom:10px">
-					<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Icon (emoji)</div>
-					<input type="text" id="catIcon" placeholder="e.g. 🎓" style="width:80px;text-align:center;font-size:18px" />
+
+				<!-- LIST VIEW -->
+				<div id="catListView">
+					<div class="modal-title">Manage Categories</div>
+					<div id="catListContainer" style="margin-bottom:12px"></div>
+					<div class="modal-btns">
+						<button class="btn btn-secondary" onclick="closeCatModalDirect()">Close</button>
+						<button class="btn btn-primary" onclick="showCatEditView(null)">+ Add category</button>
+					</div>
 				</div>
-				<div style="margin-bottom:10px">
-					<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Color</div>
-					<div class="cat-color-palette" id="catColorPalette"></div>
+
+				<!-- EDIT VIEW -->
+				<div id="catEditView" style="display:none">
+					<div class="modal-title" id="catEditTitle">Add Category</div>
+					<div style="margin-bottom:6px;font-size:12px;color:var(--muted)">Name</div>
+					<input type="text" id="catLabel" placeholder="e.g. Doctorat Prep" />
+					<div style="margin-bottom:6px;font-size:12px;color:var(--muted)">Icon (one emoji)</div>
+					<input type="text" id="catIcon" placeholder="🎓" style="width:72px;text-align:center;font-size:20px;margin-bottom:14px" />
+					<div style="margin-bottom:8px;font-size:12px;color:var(--muted)">Color</div>
+					<div class="cat-color-palette" id="catColorPalette" style="margin-bottom:16px"></div>
+					<div class="modal-btns">
+						<button class="btn btn-secondary" onclick="showCatListView()">← Back</button>
+						<button class="btn btn-danger" id="catDeleteBtn" onclick="deleteCategoryConfirm()" style="display:none">Delete</button>
+						<button class="btn btn-primary" onclick="saveCategoryModal()">Save</button>
+					</div>
 				</div>
-				<div class="modal-btns">
-					<button class="btn btn-secondary" onclick="closeCatModalDirect()">Cancel</button>
-					<button class="btn btn-danger" id="catDeleteBtn" onclick="deleteCategoryModal()" style="display:none">Delete</button>
-					<button class="btn btn-primary" onclick="saveCategoryModal()">Save</button>
-				</div>
+
 			</div>
 		</div>
 
@@ -2576,108 +2606,64 @@
 			let selectedCatColor = CATEGORY_COLORS[0];
 
 			function openCatListModal() {
-				// Show list of all categories in the category modal
-				document.getElementById('catModalTitle').textContent = 'Manage Categories';
-				const palette = document.getElementById('catColorPalette');
-				const labelEl = document.getElementById('catLabel');
-				const iconEl = document.getElementById('catIcon');
-				const deleteBtn = document.getElementById('catDeleteBtn');
+				showCatListView();
+				document.getElementById('catModalOverlay').classList.add('open');
+			}
 
-				// Render as a list instead of edit form
-				labelEl.style.display = 'none';
-				iconEl.parentElement.style.display = 'none';
-				palette.parentElement.style.display = 'none';
-				deleteBtn.style.display = 'none';
-
-				// Build list HTML inside modal title area
-				const listHtml = categories.sort((a,b) => a.sort_order - b.sort_order).map(c => `
+			function showCatListView() {
+				document.getElementById('catListView').style.display = '';
+				document.getElementById('catEditView').style.display = 'none';
+				// Rebuild list
+				const list = categories.sort((a,b) => a.sort_order - b.sort_order).map(c => `
 					<div class="cat-list-item">
 						<div class="cat-list-dot" style="background:${c.color}"></div>
 						<div class="cat-list-label">${c.icon} ${c.label}</div>
 						${c.is_default ? '<span class="cat-list-badge">default</span>' : ''}
-						<button class="cat-list-edit" onclick="openEditCatModal('${c.id}')">✎</button>
-					</div>
-				`).join('');
-
-				// Inject into modal
-				const modal = document.querySelector('#catModalOverlay .modal');
-				// Remove old list if any
-				const old = modal.querySelector('.cat-list-container');
-				if (old) old.remove();
-				const listDiv = document.createElement('div');
-				listDiv.className = 'cat-list-container';
-				listDiv.innerHTML = listHtml;
-				modal.insertBefore(listDiv, modal.querySelector('.modal-btns'));
-
-				// Update save button to "Add new"
-				const btns = modal.querySelector('.modal-btns');
-				btns.innerHTML = `
-					<button class="btn btn-secondary" onclick="closeCatModalDirect()">Close</button>
-					<button class="btn btn-primary" onclick="openAddCatModal()">+ Add category</button>
-				`;
-				document.getElementById('catModalOverlay').classList.add('open');
+						<button class="cat-list-edit" onclick="showCatEditView('${c.id}')">✎</button>
+					</div>`).join('');
+				document.getElementById('catListContainer').innerHTML = list;
 			}
 
-			function openAddCatModal() {
-				editingCatId = null;
-				selectedCatColor = CATEGORY_COLORS[0];
-				_showCatEditForm('Add Category', '', '', selectedCatColor, false);
-			}
-
-			function openEditCatModal(id) {
-				const c = getCatById(id);
-				if (!c) return;
+			function showCatEditView(id) {
 				editingCatId = id;
-				selectedCatColor = c.color;
-				_showCatEditForm('Edit Category', c.label, c.icon, c.color, !c.is_default);
-			}
+				document.getElementById('catListView').style.display = 'none';
+				document.getElementById('catEditView').style.display = '';
 
-			function _showCatEditForm(title, label, icon, color, showDelete) {
-				document.getElementById('catModalTitle').textContent = title;
-				const labelEl = document.getElementById('catLabel');
-				const iconEl = document.getElementById('catIcon');
-				const palette = document.getElementById('catColorPalette');
-				const deleteBtn = document.getElementById('catDeleteBtn');
-
-				labelEl.style.display = '';
-				labelEl.value = label;
-				iconEl.parentElement.style.display = '';
-				iconEl.value = icon;
-				palette.parentElement.style.display = '';
-				deleteBtn.style.display = showDelete ? 'block' : 'none';
-
-				// Remove list if showing
-				const old = document.querySelector('#catModalOverlay .cat-list-container');
-				if (old) old.remove();
+				if (id) {
+					const c = getCatById(id);
+					if (!c) return;
+					selectedCatColor = c.color;
+					document.getElementById('catEditTitle').textContent = 'Edit Category';
+					document.getElementById('catLabel').value = c.label;
+					document.getElementById('catIcon').value = c.icon;
+					document.getElementById('catDeleteBtn').style.display = c.is_default ? 'none' : 'block';
+				} else {
+					selectedCatColor = CATEGORY_COLORS[0];
+					document.getElementById('catEditTitle').textContent = 'Add Category';
+					document.getElementById('catLabel').value = '';
+					document.getElementById('catIcon').value = '';
+					document.getElementById('catDeleteBtn').style.display = 'none';
+				}
 
 				// Build color palette
-				palette.innerHTML = CATEGORY_COLORS.map(col => `
-					<div class="cat-color-swatch ${col === color ? 'selected' : ''}"
+				document.getElementById('catColorPalette').innerHTML = CATEGORY_COLORS.map(col => `
+					<div class="cat-color-swatch ${col === selectedCatColor ? 'selected' : ''}"
 						style="background:${col}"
 						onclick="selectCatColor('${col}')"></div>
 				`).join('');
-
-				// Reset save/cancel buttons
-				const modal = document.querySelector('#catModalOverlay .modal');
-				const existingBtns = modal.querySelector('.modal-btns');
-				existingBtns.innerHTML = `
-					<button class="btn btn-secondary" onclick="openCatListModal()">← Back</button>
-					${showDelete ? `<button class="btn btn-danger" id="catDeleteBtn" onclick="deleteCategoryModal()">Delete</button>` : ''}
-					<button class="btn btn-primary" onclick="saveCategoryModal()">Save</button>
-				`;
 			}
 
 			function selectCatColor(color) {
 				selectedCatColor = color;
 				document.querySelectorAll('.cat-color-swatch').forEach(s => {
-					s.classList.toggle('selected', s.style.background === color || s.style.backgroundColor === color);
+					s.classList.toggle('selected', s.getAttribute('style').includes(color));
 				});
 			}
 
 			async function saveCategoryModal() {
 				const label = document.getElementById('catLabel').value.trim();
 				const icon  = document.getElementById('catIcon').value.trim() || '📌';
-				if (!label) return;
+				if (!label) { showToast('Enter a category name'); return; }
 
 				if (editingCatId) {
 					const c = getCatById(editingCatId);
@@ -2691,27 +2677,34 @@
 				await saveCategoriesRemote();
 				populateCategorySelects();
 				if (document.getElementById('view-tasks').classList.contains('active')) renderWeeklyTasks();
-				openCatListModal();
+				showCatListView();
+				showToast(`✓ Category ${editingCatId ? 'updated' : 'added'}`);
 			}
 
-			async function deleteCategoryModal() {
+			async function deleteCategoryConfirm() {
 				if (!editingCatId) return;
 				const c = getCatById(editingCatId);
 				if (!c || c.is_default) { showToast('Default categories cannot be deleted'); return; }
-				// Check if any tasks use this category
 				const allTasks = Object.values(state.weeklyTasks).flat();
-				const inUse = allTasks.some(t => t.cat === editingCatId);
-				if (inUse) { showToast('Remove all goals in this category first'); return; }
+				if (allTasks.some(t => t.cat === editingCatId)) {
+					showToast('Remove all goals in this category first');
+					return;
+				}
 				categories = categories.filter(c => c.id !== editingCatId);
 				if (supabaseReady) { try { await sb.from('lifeos_categories').delete().eq('id', editingCatId); } catch(e) {} }
 				saveCategoriesLocal();
 				populateCategorySelects();
 				if (document.getElementById('view-tasks').classList.contains('active')) renderWeeklyTasks();
-				closeCatModalDirect();
+				showCatListView();
+				showToast('Category deleted');
 			}
 
-			function closeCatModal(e) { if (e.target === document.getElementById('catModalOverlay')) closeCatModalDirect(); }
-			function closeCatModalDirect() { document.getElementById('catModalOverlay').classList.remove('open'); }
+			function closeCatModal(e) {
+				if (e.target === document.getElementById('catModalOverlay')) closeCatModalDirect();
+			}
+			function closeCatModalDirect() {
+				document.getElementById('catModalOverlay').classList.remove('open');
+			}
 
 			// ═══════════════════════════════════════════════════════════════
 			// WEEKLY TASKS
