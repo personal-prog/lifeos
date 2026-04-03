@@ -1711,7 +1711,7 @@
 					});
 					supabaseReady = true;
 					setSyncStatus("synced");
-					setupRealtimeSubscriptions();
+					// Realtime subscriptions set up later in unlockApp after data loads
 				} catch (e) {
 					supabaseReady = false;
 					setSyncStatus("error");
@@ -3449,6 +3449,8 @@
 				await initCategories();
 				await initHabits();
 				await loadSettingsRemote();
+				// All realtime subscriptions after data is loaded
+				setupRealtimeSubscriptions();
 				setupHabitsRealtime();
 				setupSettingsRealtime();
 				setupCategoriesRealtime();
