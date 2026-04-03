@@ -6,11 +6,9 @@
 			name="viewport"
 			content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
 		/>
-		<meta name="apple-mobile-web-app-capable" content="yes" />
-		<meta
-			name="apple-mobile-web-app-status-bar-style"
-			content="black-translucent"
-		/>
+		<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 		<meta name="theme-color" content="#0a0f1a" />
 		<title>LifeOS</title>
 		<link rel="manifest" href="manifest.json" />
@@ -1699,6 +1697,7 @@
 			let supabaseReady = false;
 
 			function initSupabase() {
+				if (sb) return; // already initialized — prevent duplicate GoTrueClient
 				if (SUPABASE_URL === "YOUR_SUPABASE_URL") {
 					supabaseReady = false;
 					setSyncStatus("error");
@@ -1708,6 +1707,7 @@
 				try {
 					sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 						realtime: { params: { eventsPerSecond: 10 } },
+						auth: { persistSession: false, autoRefreshToken: false },
 					});
 					supabaseReady = true;
 					setSyncStatus("synced");
