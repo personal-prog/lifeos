@@ -1719,7 +1719,10 @@
 			}
 
 			function setupRealtimeSubscriptions() {
-				// Listen for changes to schedule (weeks table)
+				if (!supabaseReady) return;
+				// Remove any existing channels to prevent duplicate subscription errors
+				try { sb.removeAllChannels(); } catch(e) {}
+
 				sb.channel("lifeos-weeks-changes")
 					.on("postgres_changes", { event: "*", schema: "public", table: "lifeos_weeks" },
 						(payload) => {
@@ -3439,7 +3442,10 @@
 			// ═══════════════════════════════════════════════════════════════
 			// UNLOCK & BOOT
 			// ═══════════════════════════════════════════════════════════════
+			let appUnlocked = false;
 			async function unlockApp() {
+				if (appUnlocked) return;
+				appUnlocked = true;
 				document.getElementById('loadingOverlay').classList.remove('hidden');
 				document.getElementById('loadingText').textContent = 'Initializing sync…';
 				initSupabase();
