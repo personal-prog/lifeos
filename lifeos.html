@@ -2514,9 +2514,11 @@
 			}
 
 			function getCatColor(id) {
+				// First check dynamic categories (goal categories)
 				const c = getCatById(id);
-				// fallback: check old CAT_COLORS for legacy task data
-				return c?.color || CAT_COLORS[id] || '#3b82f6';
+				if (c) return c.color;
+				// Fall back to hardcoded schedule block colors
+				return CAT_COLORS[id] || '#3b82f6';
 			}
 
 			function getCatLabel(id) {
@@ -2590,6 +2592,7 @@
 
 			// ── Populate dropdowns ──
 			function populateCategorySelects() {
+				// Goal categories and habit life areas use the dynamic categories list
 				const opts = categories
 					.sort((a,b) => a.sort_order - b.sort_order)
 					.map(c => `<option value="${c.id}">${c.icon} ${c.label}</option>`)
@@ -2597,8 +2600,9 @@
 				const taskSel = document.getElementById('taskCategory');
 				const habitSel = document.getElementById('habitArea');
 				if (taskSel) taskSel.innerHTML = opts;
-				// Habit area also gets categories
 				if (habitSel) habitSel.innerHTML = opts;
+				// Note: block modal (modalCategory) keeps its own fixed schedule types
+				// (prayer, swim, shop, etc.) — these are visual colors, not goal categories
 			}
 
 			// ── Category management modal ──
@@ -3078,28 +3082,45 @@
 				const idx = habitsLog[id].log.indexOf(today);
 				if (idx > -1) habitsLog[id].log.splice(idx, 1);
 				else habitsLog[id].log.push(today);
-				saveHabitsLog();
+				saveHabitsLog(id);
 				renderHabits();
 			}
 
 			// ── Persistence: Log ──
-			function saveHabitsLog() {
+			function saveHabitsLog(changedId) {
 				try { localStorage.setItem('lifeos_habitslog', JSON.stringify(habitsLog)); } catch(e) {}
 				if (!supabaseReady) return;
 				clearTimeout(window._habitsLogTimer);
 				window._habitsLogTimer = setTimeout(async () => {
 					try {
-						const upserts = habitDefs.map(h => ({
-							id: h.id,
-							label: h.label,
-							category: h.group_key,
-							block_cat: h.life_area,
-							log: habitsLog[h.id]?.log || [],
-							device_id: DEVICE_ID,
-						}));
-						await sb.from('lifeos_habits').upsert(upserts, { onConflict: 'id' });
-					} catch(e) {}
-				}, 1000);
+						if (changedId) {
+							// Only upsert the habit that changed
+							const h = habitDefs.find(h => h.id === changedId);
+							const label = h?.label || changedId;
+							const group = h?.group_key || 'morning';
+							const area  = h?.life_area || 'health';
+							await sb.from('lifeos_habits').upsert({
+								id: changedId,
+								label,
+								category: group,
+								block_cat: area,
+								log: habitsLog[changedId]?.log || [],
+								device_id: DEVICE_ID,
+							}, { onConflict: 'id' });
+						} else {
+							// Full sync — upsert all
+							const upserts = habitDefs.map(h => ({
+								id: h.id,
+								label: h.label,
+								category: h.group_key,
+								block_cat: h.life_area,
+								log: habitsLog[h.id]?.log || [],
+								device_id: DEVICE_ID,
+							}));
+							if (upserts.length) await sb.from('lifeos_habits').upsert(upserts, { onConflict: 'id' });
+						}
+					} catch(e) { console.error('saveHabitsLog error:', e); }
+				}, 600);
 			}
 
 			function loadHabitsLogLocal() {
