@@ -1521,7 +1521,7 @@
 		<div class="modal-overlay" id="taskModalOverlay" onclick="closeTaskModal(event)">
 			<div class="modal">
 				<div class="modal-handle"></div>
-				<div class="modal-title" id="taskModalTitle">Add Weekly Goal</div>
+				<div class="modal-title">Add Weekly Goal</div>
 				<input type="text" id="taskLabel" placeholder="e.g. Upload Master's activities to platform" />
 				<select id="taskCategory">
 					<!-- populated dynamically -->
@@ -1538,8 +1538,7 @@
 				</select>
 				<div class="modal-btns">
 					<button class="btn btn-secondary" onclick="closeTaskModalDirect()">Cancel</button>
-					<button class="btn btn-danger" id="taskDeleteBtn" onclick="deleteWeeklyTask()" style="display:none">Delete</button>
-					<button class="btn btn-primary" id="taskSaveBtn" onclick="saveWeeklyTask()">Add Goal</button>
+					<button class="btn btn-primary" onclick="saveWeeklyTask()">Add Goal</button>
 				</div>
 			</div>
 		</div>
@@ -2728,12 +2727,11 @@
 					html += `<div class="section-title">${cat.icon} ${cat.label}</div>`;
 					catTasks.forEach(task => {
 						html += `
-							<div class="weekly-task-row ${task.done ? 'done' : ''}">
-								<div class="wt-dot" style="background:${cat.color}" onclick="toggleWeeklyTask('${task.id}')"></div>
-								<div class="wt-label" onclick="toggleWeeklyTask('${task.id}')">${task.label}</div>
-								<div class="wt-day" onclick="toggleWeeklyTask('${task.id}')">${task.day || 'Any'}</div>
-								<button class="block-edit" onclick="openEditTaskModal('${task.id}')" style="flex-shrink:0">✎</button>
-								<div class="wt-check" onclick="toggleWeeklyTask('${task.id}')">${task.done ? '✓' : ''}</div>
+							<div class="weekly-task-row ${task.done ? 'done' : ''}" onclick="toggleWeeklyTask('${task.id}')">
+								<div class="wt-dot" style="background:${cat.color}"></div>
+								<div class="wt-label">${task.label}</div>
+								<div class="wt-day">${task.day || 'Any'}</div>
+								<div class="wt-check">${task.done ? '✓' : ''}</div>
 							</div>`;
 					});
 				});
@@ -2747,12 +2745,11 @@
 					orphaned.forEach(task => {
 						const color = legacy[task.cat] || '#3b82f6';
 						html += `
-							<div class="weekly-task-row ${task.done ? 'done' : ''}">
-								<div class="wt-dot" style="background:${color}" onclick="toggleWeeklyTask('${task.id}')"></div>
-								<div class="wt-label" onclick="toggleWeeklyTask('${task.id}')">${task.label}</div>
-								<div class="wt-day" onclick="toggleWeeklyTask('${task.id}')">${task.day || 'Any'}</div>
-								<button class="block-edit" onclick="openEditTaskModal('${task.id}')" style="flex-shrink:0">✎</button>
-								<div class="wt-check" onclick="toggleWeeklyTask('${task.id}')">${task.done ? '✓' : ''}</div>
+							<div class="weekly-task-row ${task.done ? 'done' : ''}" onclick="toggleWeeklyTask('${task.id}')">
+								<div class="wt-dot" style="background:${color}"></div>
+								<div class="wt-label">${task.label}</div>
+								<div class="wt-day">${task.day || 'Any'}</div>
+								<div class="wt-check">${task.done ? '✓' : ''}</div>
 							</div>`;
 					});
 				}
@@ -2881,65 +2878,38 @@
 					.classList.remove("open");
 			}
 
-			let editingTaskId = null;
-
 			function openTaskModal() {
-				editingTaskId = null;
-				document.getElementById('taskModalTitle').textContent = 'Add Weekly Goal';
-				document.getElementById('taskLabel').value = '';
-				document.getElementById('taskDay').value = 'any';
-				document.getElementById('taskDeleteBtn').style.display = 'none';
-				document.getElementById('taskSaveBtn').textContent = 'Add Goal';
-				document.getElementById('taskModalOverlay').classList.add('open');
+				document.getElementById("taskLabel").value = "";
+				document
+					.getElementById("taskModalOverlay")
+					.classList.add("open");
 			}
-
-			function openEditTaskModal(id) {
-				const tasks = getWeeklyTasks(currentWeekOffset);
-				const t = tasks.find(t => t.id === id);
-				if (!t) return;
-				editingTaskId = id;
-				document.getElementById('taskModalTitle').textContent = 'Edit Goal';
-				document.getElementById('taskLabel').value = t.label;
-				document.getElementById('taskCategory').value = t.cat;
-				document.getElementById('taskDay').value = t.day === 'Any' ? 'any' : (t.day || 'any');
-				document.getElementById('taskDeleteBtn').style.display = 'block';
-				document.getElementById('taskSaveBtn').textContent = 'Save';
-				document.getElementById('taskModalOverlay').classList.add('open');
-			}
-
 			function saveWeeklyTask() {
-				const label = document.getElementById('taskLabel').value.trim();
-				const cat   = document.getElementById('taskCategory').value;
-				const day   = document.getElementById('taskDay').value;
+				const label = document.getElementById("taskLabel").value.trim();
+				const cat = document.getElementById("taskCategory").value;
+				const day = document.getElementById("taskDay").value;
 				if (!label) return;
 				const tasks = getWeeklyTasks(currentWeekOffset);
-				if (editingTaskId) {
-					const t = tasks.find(t => t.id === editingTaskId);
-					if (t) { t.label = label; t.cat = cat; t.day = day === 'any' ? 'Any' : day; }
-				} else {
-					tasks.push({ id: uid(), label, cat, day: day === 'any' ? 'Any' : day, done: false });
-				}
+				tasks.push({
+					id: uid(),
+					label,
+					cat,
+					day: day === "any" ? "Any" : day,
+					done: false,
+				});
 				saveState();
 				closeTaskModalDirect();
 				renderWeeklyTasks();
 				updateProgress();
 			}
-
-			function deleteWeeklyTask() {
-				if (!editingTaskId) return;
-				const key = getWeekKey(currentWeekOffset);
-				state.weeklyTasks[key] = (state.weeklyTasks[key] || []).filter(t => t.id !== editingTaskId);
-				saveState();
-				closeTaskModalDirect();
-				renderWeeklyTasks();
-				updateProgress();
-			}
-
 			function closeTaskModal(e) {
-				if (e.target === document.getElementById('taskModalOverlay')) closeTaskModalDirect();
+				if (e.target === document.getElementById("taskModalOverlay"))
+					closeTaskModalDirect();
 			}
 			function closeTaskModalDirect() {
-				document.getElementById('taskModalOverlay').classList.remove('open');
+				document
+					.getElementById("taskModalOverlay")
+					.classList.remove("open");
 			}
 
 			// ═══════════════════════════════════════════════════════════════
